@@ -11,9 +11,7 @@ export default function TaskList({
   highlightId?: string;
   onTaskUpdate: () => void;
 }) {
-  const otherTasks = tasks.filter((t) => t.id !== highlightId);
-
-  if (otherTasks.length === 0) return null;
+  if (tasks.length === 0) return null;
 
   return (
     <div className="space-y-2">
@@ -21,8 +19,17 @@ export default function TaskList({
         할 일 {tasks.length}개
       </h3>
       <div className="space-y-2">
-        {otherTasks.map((task) => (
-          <TaskItem key={task.id} task={task} onTaskUpdate={onTaskUpdate} />
+        {tasks.map((task) => (
+          <div
+            key={task.id}
+            className={
+              task.id === highlightId
+                ? "ring-1 ring-blue-300 rounded-xl"
+                : ""
+            }
+          >
+            <TaskItem task={task} onTaskUpdate={onTaskUpdate} />
+          </div>
         ))}
       </div>
     </div>

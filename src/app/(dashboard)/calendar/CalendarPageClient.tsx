@@ -42,6 +42,16 @@ function isSameDay(d1: Date, d2: Date) {
   );
 }
 
+// Parse event date for calendar placement.
+// All-day events are stored as noon UTC — use UTC date to avoid timezone shift.
+function parseEventDate(event: { start_at: string; is_all_day?: boolean | null }): Date {
+  if (event.is_all_day) {
+    const d = new Date(event.start_at);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  }
+  return new Date(event.start_at);
+}
+
 function formatTime12h(date: Date) {
   return date.toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -79,7 +89,8 @@ function getWeekDays(start: Date) {
 function groupByDate(events: Event[]): Record<string, Event[]> {
   const grouped: Record<string, Event[]> = {};
   events.forEach((event) => {
-    const date = new Date(event.start_at).toLocaleDateString("ko-KR", {
+    const d = parseEventDate(event);
+    const date = d.toLocaleDateString("ko-KR", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -113,7 +124,7 @@ function MonthView({
     const map = new Map<number, Event[]>();
     events.forEach((e) => {
       if (e.status === "cancelled") return;
-      const d = new Date(e.start_at);
+      const d = parseEventDate(e);
       if (d.getFullYear() === year && d.getMonth() === month) {
         const day = d.getDate();
         if (!map.has(day)) map.set(day, []);
@@ -284,7 +295,7 @@ function WeekView({
 
     events.forEach((ev) => {
       if (ev.status === "cancelled") return;
-      const sd = new Date(ev.start_at);
+      const sd = parseEventDate(ev);
       weekDays.forEach((wd, idx) => {
         if (isSameDay(sd, wd)) {
           const bucket = map.get(idx)!;

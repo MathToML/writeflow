@@ -407,6 +407,15 @@ async function createEvent(
   userId: string,
   dumpId: string | null,
 ): Promise<ToolResult> {
+  // Normalize all-day events to noon UTC to prevent timezone day-shift
+  let startAt = args.start_at as string;
+  let endAt = (args.end_at as string) ?? null;
+  if (args.is_all_day) {
+    const dateOnly = startAt.slice(0, 10); // "YYYY-MM-DD"
+    startAt = `${dateOnly}T12:00:00Z`;
+    endAt = null;
+  }
+
   const { data, error } = await supabase
     .from("events")
     .insert({
@@ -414,8 +423,8 @@ async function createEvent(
       dump_id: dumpId,
       title: args.title as string,
       description: (args.description as string) ?? null,
-      start_at: args.start_at as string,
-      end_at: (args.end_at as string) ?? null,
+      start_at: startAt,
+      end_at: endAt,
       location: (args.location as string) ?? null,
       attendees: (args.attendees as string[]) ?? [],
       is_all_day: (args.is_all_day as boolean) ?? false,
@@ -437,8 +446,16 @@ async function updateEvent(
   const updates: Record<string, unknown> = {};
   if (args.title !== undefined) updates.title = args.title;
   if (args.description !== undefined) updates.description = args.description;
-  if (args.start_at !== undefined) updates.start_at = args.start_at;
-  if (args.end_at !== undefined) updates.end_at = args.end_at;
+  if (args.start_at !== undefined) {
+    let startAt = args.start_at as string;
+    // Normalize all-day events to noon UTC
+    if (args.is_all_day) {
+      const dateOnly = startAt.slice(0, 10);
+      startAt = `${dateOnly}T12:00:00Z`;
+    }
+    updates.start_at = startAt;
+  }
+  if (args.end_at !== undefined) updates.end_at = args.is_all_day ? null : args.end_at;
   if (args.location !== undefined) updates.location = args.location;
   if (args.status !== undefined) updates.status = args.status as EventStatus;
   if (args.is_all_day !== undefined) updates.is_all_day = args.is_all_day;
@@ -547,6 +564,8 @@ async function addTaskNote(
   const noteText = args.note as string;
   const attachImage = args.attach_image as boolean | undefined;
 
+  console.log("[addTaskNote] Called with:", { taskId, noteText: noteText?.slice(0, 100), attachImage, hasMediaUrl: !!mediaUrl });
+
   // Read current notes
   const { data: currentTask, error: fetchError } = await supabase
     .from("tasks")
@@ -555,7 +574,10 @@ async function addTaskNote(
     .eq("user_id", userId)
     .single();
 
-  if (fetchError) return { success: false, error: fetchError.message };
+  if (fetchError) {
+    console.log("[addTaskNote] Fetch error:", fetchError.message);
+    return { success: false, error: fetchError.message };
+  }
 
   const currentNotes =
     (currentTask.notes as { text: string; created_at: string; media_url?: string }[] | null) ?? [];
@@ -579,6 +601,8 @@ async function addTaskNote(
     }
   }
 
+  console.log("[addTaskNote] Updating task with notes count:", updatedNotes.length, "status update:", args.status ?? "none");
+
   const { data, error } = await supabase
     .from("tasks")
     .update(updates as Database["public"]["Tables"]["tasks"]["Update"])
@@ -587,9 +611,13 @@ async function addTaskNote(
     .select("id, title, status, notes")
     .single();
 
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    console.log("[addTaskNote] Update error:", error.message);
+    return { success: false, error: error.message };
+  }
 
   const savedNotes = Array.isArray(data.notes) ? data.notes : [];
+  console.log("[addTaskNote] Success! Saved notes count:", savedNotes.length, "has_image:", !!(attachImage && mediaUrl));
   return {
     success: true,
     data: {

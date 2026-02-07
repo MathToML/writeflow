@@ -35,8 +35,12 @@ const WEEKDAY_OPTIONS = [
 ];
 
 function parseDate(iso: string) {
+  // Use UTC to avoid timezone day-shift (all-day events stored as noon UTC)
   const d = new Date(iso);
-  return d.toISOString().slice(0, 10);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function parseTime(iso: string) {
@@ -124,20 +128,16 @@ export default function EventFormModal({
     if (!title.trim()) return;
     setIsSaving(true);
 
-    const startAt = isAllDay
-      ? `${date}T00:00:00`
-      : `${date}T${startTime}:00`;
-    const endAt = isAllDay
-      ? null
-      : `${date}T${endTime}:00`;
-
-    const startDateObj = new Date(startAt);
-    const endDateObj = endAt ? new Date(endAt) : null;
-
+    // All-day events: noon UTC to prevent timezone day-shift
+    // Timed events: local time → ISO
     const body: Record<string, unknown> = {
       title: title.trim(),
-      start_at: startDateObj.toISOString(),
-      end_at: endDateObj?.toISOString() ?? null,
+      start_at: isAllDay
+        ? `${date}T12:00:00Z`
+        : new Date(`${date}T${startTime}:00`).toISOString(),
+      end_at: isAllDay
+        ? null
+        : new Date(`${date}T${endTime}:00`).toISOString(),
       is_all_day: isAllDay,
       location: location.trim() || null,
       description: description.trim() || null,

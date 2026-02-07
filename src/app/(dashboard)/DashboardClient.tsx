@@ -131,7 +131,7 @@ export default function DashboardClient({
   return (
     <div className="flex flex-col h-[calc(100dvh-6.5rem)]">
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto space-y-5 pb-4">
+      <div className="flex-1 overflow-y-auto space-y-5 pb-4 px-1 -mx-1">
         {/* 1. Date / Time Header */}
         <div className="text-center space-y-1 pt-2">
           <p className="text-2xl font-bold text-slate-900">
@@ -223,7 +223,11 @@ export default function DashboardClient({
           {upcomingEvents.length > 0 ? (
             <div className="space-y-1">
               {upcomingEvents.map((event) => {
-                const startDate = new Date(event.start_at);
+                // All-day events: use UTC date to avoid timezone day-shift
+                const raw = new Date(event.start_at);
+                const startDate = event.is_all_day
+                  ? new Date(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate())
+                  : raw;
                 return (
                   <div
                     key={event.id}

@@ -116,6 +116,7 @@ export async function POST(request: Request) {
   }));
 
   // 5. Run agent
+  console.log("[Chat API] Running agent. hasImage:", hasImage, "mediaUrl:", mediaUrl ? "set" : "null");
   try {
     const result = await runAgent(
       message?.trim() || "",
@@ -142,6 +143,7 @@ export async function POST(request: Request) {
       })
       .eq("id", dump.id);
 
+    console.log("[Chat API] Agent result. toolCalls:", result.toolCalls.map((tc) => tc.name), "message:", result.message.slice(0, 100));
     return NextResponse.json({
       message: result.message,
       dumpId: dump.id,

@@ -119,7 +119,21 @@ ${userName}님의 할 일, 일정, 기록을 관리합니다.
 - 사용자를 overwhelm하지 않습니다
 
 ## 현재 시간
-${context.currentDateTime} (${context.timezone})
+${(() => {
+  const dateStr = context.currentDateTime.split(" ")[0];
+  const d = new Date(dateStr + "T12:00:00");
+  const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+  const WEEKDAYS_FULL = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+  const dayOfWeek = WEEKDAYS_FULL[d.getDay()];
+  // Show next 10 days as date reference
+  const dates = Array.from({ length: 10 }, (_, i) => {
+    const wd = new Date(d);
+    wd.setDate(d.getDate() + i + 1);
+    return `${WEEKDAYS[wd.getDay()]}(${wd.toISOString().slice(5, 10).replace("-", "/")})`;
+  }).join(" ");
+  return `오늘: ${context.currentDateTime} ${dayOfWeek} (${context.timezone})
+다음 10일: ${dates}`;
+})()}
 
 ## ${userName}님의 현재 상태
 
@@ -151,8 +165,11 @@ ${personaFacts.length > 0
 3. 기존 항목의 업데이트인지 새 항목인지 반드시 판단하세요 (위의 목록 참조). 제목이 정확히 일치하지 않으면 함부로 매칭하지 마세요
 4. 도구 호출 후에는 무엇을 했는지 자연스럽게 알려주세요
 5. 단순 대화(인사, 질문)에는 도구 없이 답하세요
-6. 날짜/시간이 애매하면 현재 시간 기준으로 합리적으로 추론하세요
-7. start_at/end_at에는 반드시 타임존 오프셋을 포함하세요
+6. 날짜/시간 규칙:
+   - "이번주 [요일]" = 위의 "다음 10일"에서 가장 가까운 해당 요일의 날짜를 사용하세요
+   - **반드시** 위의 날짜 참조표를 보고 정확한 날짜를 확인하세요. 절대 암산하지 마세요
+   - 종일 이벤트의 start_at은 "YYYY-MM-DD" 형식(시간 없이)으로 설정하세요
+7. 시간이 있는 이벤트의 start_at/end_at에는 반드시 타임존 오프셋을 포함하세요
 8. task의 status를 done으로 바꿀 때는 격려해주세요
 9. 사용자가 할 일의 진행 상황을 알려주면 add_task_note를 사용하세요
 10. "다 했어", "완료" 등의 표현은 update_task(status: done)을 사용하세요
@@ -359,12 +376,15 @@ export async function runAgent(
     if (!functionCalls || functionCalls.length === 0) {
       // No more tool calls — return text
       const text = extractText(type, result);
+      console.log("[Agent] Final text response (no tool calls). Iteration:", i);
       return { message: text, toolCalls };
     }
 
     // Execute all function calls
+    console.log("[Agent] Tool calls detected:", functionCalls.map((fc) => fc.name));
     const functionResponses: Part[] = [];
     for (const fc of functionCalls) {
+      console.log(`[Agent] Executing tool: ${fc.name}`, JSON.stringify(fc.args));
       toolCalls.push({ name: fc.name, args: fc.args });
       const toolResult = await executeTool(
         fc.name,
@@ -374,6 +394,7 @@ export async function runAgent(
         context.dumpId,
         context.mediaUrl,
       );
+      console.log(`[Agent] Tool result for ${fc.name}:`, JSON.stringify(toolResult));
       functionResponses.push({
         functionResponse: {
           name: fc.name,
