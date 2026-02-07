@@ -29,22 +29,28 @@ export async function POST(request: Request) {
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  // Fetch active tasks + today's events in parallel
-  const [{ data: tasks }, { data: todayEvents }] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("*")
-      .eq("user_id", user.id)
-      .in("status", ["pending", "in_progress"])
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("events")
-      .select("id, title, start_at, is_all_day, location")
-      .eq("user_id", user.id)
-      .gte("start_at", todayStart.toISOString())
-      .lte("start_at", todayEnd.toISOString())
-      .order("start_at", { ascending: true }),
-  ]);
+  // Fetch active tasks + today's events + persona in parallel
+  const [{ data: tasks }, { data: todayEvents }, { data: profile }] =
+    await Promise.all([
+      supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("status", ["pending", "in_progress"])
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("events")
+        .select("id, title, start_at, is_all_day, location")
+        .eq("user_id", user.id)
+        .gte("start_at", todayStart.toISOString())
+        .lte("start_at", todayEnd.toISOString())
+        .order("start_at", { ascending: true }),
+      supabase
+        .from("profiles")
+        .select("persona")
+        .eq("id", user.id)
+        .single(),
+    ]);
 
   const activeTasks = tasks ?? [];
   const events = todayEvents ?? [];
@@ -67,11 +73,16 @@ export async function POST(request: Request) {
     }
   }
 
+  // Extract persona facts
+  const persona = (profile?.persona as { facts?: { category: string; content: string }[] }) ?? {};
+  const personaFacts = persona.facts ?? [];
+
   // Generate AI recommendation
   const { taskId, reason } = await generateAIRecommendation(
     candidates,
     events,
     tz,
+    personaFacts,
   );
 
   // Cache result

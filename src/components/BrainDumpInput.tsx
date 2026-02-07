@@ -110,7 +110,7 @@ export default function BrainDumpInput({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="무엇이든 던져보세요... 일정, 할 일, 메모, 뭐든지"
+          placeholder="할 일, 일정, 메모 — 그냥 말해보세요"
           className="w-full min-h-[100px] p-4 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-800 placeholder:text-slate-400"
           disabled={isLoading}
         />

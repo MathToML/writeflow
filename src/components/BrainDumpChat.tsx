@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface Dump {
   id: string;
@@ -46,7 +47,6 @@ function dumpsToMessages(dumps: Dump[]): ChatMessage[] {
     const analysis = dump.ai_analysis;
     let aiText: string | null = null;
 
-    // New agent format: { response: string, toolCalls: [...] }
     if (
       analysis &&
       typeof analysis === "object" &&
@@ -54,9 +54,7 @@ function dumpsToMessages(dumps: Dump[]): ChatMessage[] {
       "response" in (analysis as Record<string, unknown>)
     ) {
       aiText = (analysis as { response: string }).response;
-    }
-    // Legacy classify format: [{ type, title }, ...]
-    else if (Array.isArray(analysis) && analysis.length > 0) {
+    } else if (Array.isArray(analysis) && analysis.length > 0) {
       aiText = formatLegacy(analysis as LegacyClassification[]);
     }
 
@@ -90,11 +88,27 @@ export default function BrainDumpChat({
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Auto-scroll when messages change and chat is open
+  useEffect(() => setMounted(true), []);
+
+  // Lock body scroll when chat is open
   useEffect(() => {
     if (isChatOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isChatOpen]);
+
+  // Auto-scroll when messages change
+  useEffect(() => {
+    if (isChatOpen) {
+      // Small delay so the panel has time to expand
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 100);
     }
   }, [messages, isChatOpen]);
 
@@ -102,7 +116,6 @@ export default function BrainDumpChat({
     const text = input.trim();
     if (!text || isLoading) return;
 
-    // Auto-open chat panel on submit
     onChatOpenChange(true);
 
     const userMsg: ChatMessage = {
@@ -116,7 +129,6 @@ export default function BrainDumpChat({
     setIsLoading(true);
 
     try {
-      // Build conversation history for context
       const chatHistory = messages.map((m) => ({
         role: m.role === "user" ? "user" : "model",
         content: m.content,
@@ -163,112 +175,96 @@ export default function BrainDumpChat({
   };
 
   return (
-    <div className="flex flex-col shrink-0">
-      {/* Animated chat panel using CSS Grid height transition */}
-      <div
-        className="grid transition-all duration-300 ease-out"
-        style={{ gridTemplateRows: isChatOpen ? "1fr" : "0fr" }}
-      >
-        <div className="overflow-hidden">
-          {/* Collapse button */}
-          <button
+    <>
+      {/* Backdrop — portal to body so it covers everything */}
+      {mounted &&
+        createPortal(
+          <div
+            className={`fixed inset-0 bg-black/40 z-40 transition-opacity duration-300 ${
+              isChatOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
             onClick={() => onChatOpenChange(false)}
-            className="w-full py-3 flex items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            <span>접기</span>
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-              />
-            </svg>
-          </button>
+          />,
+          document.body,
+        )}
 
-          {/* Messages area with top fade */}
-          <div className="relative">
-            <div
-              className="pointer-events-none absolute top-0 left-0 right-0 h-8 z-10"
-              style={{
-                background:
-                  "linear-gradient(to bottom, var(--tw-gradient-from, #f8fafc) 0%, transparent 100%)",
-              }}
-            />
-            <div className="max-h-64 overflow-y-auto space-y-2 px-1 pt-6 pb-2">
+      {/* Chat area — stays in normal flow, elevated above backdrop when open */}
+      <div className={`relative ${isChatOpen ? "z-50" : ""}`}>
+        {/* Messages panel — grows upward from input */}
+        <div
+          className="absolute bottom-full left-0 right-0 overflow-hidden transition-all duration-300 ease-out"
+          style={{ maxHeight: isChatOpen ? "calc(60dvh)" : "0" }}
+        >
+          <div className="bg-white rounded-t-2xl border border-b-0 border-slate-200 shadow-2xl overflow-y-auto" style={{ maxHeight: "calc(60dvh)" }}>
+            <div className="px-4 py-4">
               {messages.length === 0 ? (
-                <p className="text-center text-sm text-slate-400 py-4">
+                <p className="text-center text-sm text-slate-400 py-6">
                   대화가 시작되면 여기에 표시돼요
                 </p>
               ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
+                <div className="space-y-2">
+                  {messages.map((msg) => (
                     <div
-                      className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
-                        msg.role === "user"
-                          ? "bg-blue-600 text-white rounded-br-md"
-                          : "bg-slate-100 text-slate-700 rounded-bl-md"
-                      }`}
+                      key={msg.id}
+                      className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      {msg.content}
+                      <div
+                        className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
+                          msg.role === "user"
+                            ? "bg-blue-600 text-white rounded-br-md"
+                            : "bg-slate-100 text-slate-700 rounded-bl-md"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
-                ))
-              )}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-100 text-slate-400 px-3 py-2 rounded-2xl rounded-bl-md text-sm">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" />
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.15s]" />
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.3s]" />
-                    </span>
-                  </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-slate-100 text-slate-400 px-3 py-2 rounded-2xl rounded-bl-md text-sm">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" />
+                          <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.15s]" />
+                          <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  <div ref={messagesEndRef} />
                 </div>
               )}
-              <div ref={messagesEndRef} />
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Input - always visible */}
-      <div className="bg-slate-50 pt-2 pb-safe">
-        <div className="flex items-center gap-2 p-1 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              if (e.target.value && !isChatOpen) onChatOpenChange(true);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="무엇이든 던져보세요..."
-            className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={!input.trim() || isLoading}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-          >
-            {isLoading ? (
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
-            ) : (
-              "보내기"
-            )}
-          </button>
+        {/* Input bar — always visible, same position */}
+        <div className={`pt-2 pb-safe ${isChatOpen ? "bg-white rounded-b-2xl border border-t-0 border-slate-200 shadow-2xl px-2 pb-3" : ""}`}>
+          <div className={`flex items-center gap-2 p-1 rounded-xl border border-slate-200 shadow-sm ${isChatOpen ? "bg-slate-50" : "bg-white"}`}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onFocus={() => { if (!isChatOpen) onChatOpenChange(true); }}
+              onKeyDown={handleKeyDown}
+              placeholder="할 일, 일정, 메모 — 그냥 말해보세요"
+              className="flex-1 px-3 py-2.5 text-sm bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
+              disabled={isLoading}
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!input.trim() || isLoading}
+              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+            >
+              {isLoading ? (
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+              ) : (
+                "보내기"
+              )}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

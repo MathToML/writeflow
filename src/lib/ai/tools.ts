@@ -220,6 +220,31 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "update_persona",
+    description:
+      "Save or update a personal fact about the user — family, work, habits, preferences, etc. The AI should call this whenever the user shares personal information during conversation. Each fact has a category and key for easy updating.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        category: {
+          type: SchemaType.STRING,
+          description:
+            "One of: family, work, preference, trait, health, hobby, other",
+        },
+        key: {
+          type: SchemaType.STRING,
+          description:
+            "Unique identifier within category for upsert, e.g. 'wife_name', 'company', 'morning_routine'",
+        },
+        content: {
+          type: SchemaType.STRING,
+          description: "The fact to remember, e.g. '아내 이름은 지영'",
+        },
+      },
+      required: ["category", "key", "content"],
+    },
+  },
+  {
     name: "add_task_note",
     description:
       "Add a progress note/comment to an existing task. Use when user reports progress or wants to record something about a task.",
@@ -275,6 +300,8 @@ export async function executeTool(
       return searchRecords(args, supabase, userId);
     case "add_task_note":
       return addTaskNote(args, supabase, userId);
+    case "update_persona":
+      return updatePersona(args, supabase, userId);
     case "search_history":
       return searchHistory(args, supabase, userId);
     default:
@@ -538,6 +565,63 @@ async function addTaskNote(
 
   if (error) return { success: false, error: error.message };
   return { success: true, data };
+}
+
+interface PersonaFact {
+  category: string;
+  key: string;
+  content: string;
+  updated_at: string;
+}
+
+async function updatePersona(
+  args: Record<string, unknown>,
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<ToolResult> {
+  const category = args.category as string;
+  const key = args.key as string;
+  const content = args.content as string;
+
+  // Read current persona
+  const { data: profile, error: fetchError } = await supabase
+    .from("profiles")
+    .select("persona")
+    .eq("id", userId)
+    .single();
+
+  if (fetchError) return { success: false, error: fetchError.message };
+
+  const persona = (profile?.persona as { facts?: PersonaFact[] }) ?? {};
+  const facts: PersonaFact[] = persona.facts ?? [];
+
+  // Upsert by category+key
+  const existingIndex = facts.findIndex(
+    (f) => f.category === category && f.key === key,
+  );
+  const newFact: PersonaFact = {
+    category,
+    key,
+    content,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (existingIndex >= 0) {
+    facts[existingIndex] = newFact;
+  } else {
+    facts.push(newFact);
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ persona: { facts } as unknown as Json })
+    .eq("id", userId);
+
+  if (error) return { success: false, error: error.message };
+  return {
+    success: true,
+    data: { saved: `${category}/${key}`, content },
+  };
 }
 
 async function searchHistory(

@@ -150,7 +150,52 @@ export default function DashboardClient({
           )}
         </div>
 
-        {/* 2. Today's Schedule */}
+        {/* 2. OTTD Recommendation */}
+        <div>
+          <button
+            onClick={() => setShowOTTD((prev) => !prev)}
+            className={`w-full py-3.5 rounded-xl font-medium text-sm transition-all duration-200 active:scale-[0.98] ${
+              showOTTD
+                ? "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
+                : "bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:brightness-110"
+            }`}
+          >
+            {showOTTD ? "✕ 닫기" : "지금 뭐 할까? 🤔"}
+          </button>
+
+          {showOTTD && aiRecommendation ? (
+            <div className="mt-3 animate-in">
+              <OneThingCard
+                task={aiRecommendation.task}
+                reason={aiRecommendation.reason}
+                onComplete={refresh}
+                onDefer={() => setShowOTTD(false)}
+              />
+            </div>
+          ) : showOTTD && isLoadingOTTD ? (
+            <div className="mt-3 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl text-center space-y-3 animate-in">
+              <div className="text-3xl animate-bounce">🤔</div>
+              <p className="text-slate-600 font-medium">
+                어떤 걸 하면 좋을지 생각하고 있어요...
+              </p>
+              <div className="flex justify-center gap-1">
+                <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:0.2s]" />
+                <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:0.4s]" />
+              </div>
+            </div>
+          ) : showOTTD && !hasCandidates ? (
+            <div className="mt-3 p-6 bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200 rounded-2xl text-center space-y-2 animate-in">
+              <div className="text-3xl">🌿</div>
+              <p className="text-slate-600 font-medium">아직 추천이 없어요</p>
+              <p className="text-slate-400 text-sm">
+                할 일을 추가하면 AI가 추천해드릴게요
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        {/* 3. Today's Schedule */}
         <TodaySchedule events={events} onEventClick={handleEventClick} />
 
         {/* 3. Upcoming Events */}
@@ -215,67 +260,22 @@ export default function DashboardClient({
           onTaskUpdate={refresh}
         />
 
-        {/* 5. OneThingCard / Loading / Empty */}
-        {showOTTD && aiRecommendation ? (
-          <div className="animate-in">
-            <OneThingCard
-              task={aiRecommendation.task}
-              reason={aiRecommendation.reason}
-              onComplete={refresh}
-              onDefer={() => setShowOTTD(false)}
-            />
-          </div>
-        ) : showOTTD && isLoadingOTTD ? (
-          <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl text-center space-y-3 animate-in">
-            <div className="text-3xl animate-bounce">🤔</div>
-            <p className="text-slate-600 font-medium">
-              어떤 걸 하면 좋을지 생각하고 있어요...
-            </p>
-            <div className="flex justify-center gap-1">
-              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:0.2s]" />
-              <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse [animation-delay:0.4s]" />
-            </div>
-          </div>
-        ) : showOTTD && !hasCandidates ? (
-          <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200 rounded-2xl text-center space-y-2 animate-in">
-            <div className="text-3xl">🌿</div>
-            <p className="text-slate-600 font-medium">아직 추천이 없어요</p>
-            <p className="text-slate-400 text-sm">
-              할 일을 추가하면 AI가 추천해드릴게요
-            </p>
-          </div>
-        ) : tasks.length === 0 && !showOTTD ? (
+        {/* Empty state when no tasks at all */}
+        {tasks.length === 0 && (
           <div className="p-8 text-center bg-white rounded-2xl border border-slate-100">
             <div className="text-4xl mb-3">🌿</div>
             <p className="text-slate-600 font-medium">
               지금은 할 일이 없어요
             </p>
             <p className="text-slate-400 text-sm mt-1">
-              아래에 무엇이든 던져보세요
+              할 일, 일정, 메모 — 그냥 말하면 알아서 정리해드릴게요
             </p>
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Bottom Action Area */}
       <div className="shrink-0">
-        {/* OTTD Button - visible only when chat is closed */}
-        {!isChatOpen && (
-          <div className="pb-2">
-            <button
-              onClick={() => setShowOTTD((prev) => !prev)}
-              className={`w-full py-3.5 rounded-xl font-medium text-sm transition-all duration-200 active:scale-[0.98] ${
-                showOTTD
-                  ? "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
-                  : "bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:brightness-110"
-              }`}
-            >
-              {showOTTD ? "✕ 추천 닫기" : "🎯 What's OTTD?"}
-            </button>
-          </div>
-        )}
-
         {/* Chat + Input */}
         <BrainDumpChat
           dumps={dumps}

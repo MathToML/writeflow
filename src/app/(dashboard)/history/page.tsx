@@ -53,7 +53,7 @@ export default async function HistoryPage() {
           <div className="text-4xl mb-3">📋</div>
           <p className="text-slate-500">아직 기록이 없어요</p>
           <p className="text-slate-400 text-sm mt-1">
-            홈에서 무엇이든 던져보세요
+            홈에서 할 일, 일정, 메모를 말해보세요
           </p>
         </div>
       ) : (

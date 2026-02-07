@@ -25,6 +25,12 @@ type TaskRow = { id: string; title: string; status: string; due_date: string | n
 type EventRow = { id: string; title: string; start_at: string; location: string | null; description: string | null; is_all_day: boolean | null; recurrence_rule: string | null };
 type RecordRow = { id: string; title: string; category: string | null };
 
+interface PersonaFact {
+  category: string;
+  key: string;
+  content: string;
+}
+
 function buildSystemPrompt(
   context: AgentContext,
   activeTasks: TaskRow[],
@@ -33,6 +39,7 @@ function buildSystemPrompt(
   pastEvents: EventRow[],
   recentRecords: RecordRow[],
   userName: string,
+  personaFacts: PersonaFact[],
 ): string {
   const taskLines =
     activeTasks.length > 0
@@ -119,6 +126,13 @@ ${pastEventLines}
 ### 최근 기록
 ${recordLines}
 
+### ${userName}님에 대해 알고 있는 것
+${personaFacts.length > 0
+    ? personaFacts
+        .map((f) => `- [${f.category}] ${f.content}`)
+        .join("\n")
+    : "(아직 없음 — 대화를 통해 알아가는 중이에요)"}
+
 ## 행동 규칙
 1. 사용자 입력을 분석하여 적절한 도구를 호출하세요
 2. 여러 항목이 있으면 여러 도구를 호출하세요
@@ -133,7 +147,10 @@ ${recordLines}
 11. 진행 상황 보고와 동시에 완료를 의미하면 add_task_note에 status: done을 함께 전달하세요
 12. 종일 이벤트(공휴일, 기념일 등 시간 없는 일정)는 is_all_day: true로 설정하세요
 13. 반복 일정은 recurrence_rule에 RRULE 형식으로 설정하세요 (예: RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR)
-14. 위 목록에 없는 과거 할 일/일정/기록이 필요하면 search_history 도구로 검색하세요`;
+14. 위 목록에 없는 과거 할 일/일정/기록이 필요하면 search_history 도구로 검색하세요
+15. 사용자가 개인 정보를 언급하면 update_persona로 저장하세요 (가족 이름, 직장, 습관, 취미, 건강 등)
+16. 이미 알고 있는 정보가 변경되면 같은 category/key로 update_persona를 호출하여 갱신하세요
+17. 저장할 때 티내지 말고 자연스럽게 대화를 이어가세요 — "기억해둘게요" 같은 말은 하지 마세요`;
 }
 
 // ── SDK adapter helpers ────────────────────────────────────────────────
@@ -247,13 +264,17 @@ export async function runAgent(
       .limit(10),
     context.supabase
       .from("profiles")
-      .select("name")
+      .select("name, persona")
       .eq("id", context.userId)
       .single(),
   ]);
 
   const userName =
     profile?.name || "사용자";
+
+  // Extract persona facts
+  const persona = (profile?.persona as { facts?: PersonaFact[] }) ?? {};
+  const personaFacts: PersonaFact[] = persona.facts ?? [];
 
   // 2. Build system prompt
   const systemPrompt = buildSystemPrompt(
@@ -264,6 +285,7 @@ export async function runAgent(
     pastEvents ?? [],
     recentRecords ?? [],
     userName,
+    personaFacts,
   );
 
   // 3. Start chat session (both SDKs support the same startChat pattern)

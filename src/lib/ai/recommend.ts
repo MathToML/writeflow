@@ -193,10 +193,16 @@ export function scoreCandidates(
 
 // ── Gemini AI recommendation ──────────────────────────────────────────
 
+interface PersonaFact {
+  category: string;
+  content: string;
+}
+
 export async function generateAIRecommendation(
   candidates: ScoredCandidate[],
   todayEvents: SimpleEvent[],
   timezone: string,
+  personaFacts?: PersonaFact[],
 ): Promise<{ taskId: string; reason: string }> {
   const now = new Date();
   const bucket = getTimeBucket(now.getHours());
@@ -248,6 +254,11 @@ export async function generateAIRecommendation(
 
 ## 오늘의 일정
 ${eventLines}
+
+## 사용자에 대해 알고 있는 것
+${personaFacts && personaFacts.length > 0
+    ? personaFacts.map((f) => `- [${f.category}] ${f.content}`).join("\n")
+    : "- (아직 파악된 정보 없음)"}
 
 ## 추천 후보 (점수순)
 ${candidateLines}
