@@ -1,0 +1,63 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+
+const NAV_ITEMS = [
+  { href: "/", label: "홈", icon: "🎯" },
+  { href: "/calendar", label: "일정", icon: "📅" },
+  { href: "/tasks", label: "할 일", icon: "✅" },
+  { href: "/history", label: "기록", icon: "📋" },
+];
+
+export default function Navigation({ userName }: { userName?: string }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+  };
+
+  return (
+    <nav className="border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-6">
+          <Link href="/" className="font-bold text-slate-900">
+            OTTD
+          </Link>
+          <div className="flex items-center gap-1">
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                  pathname === item.href
+                    ? "bg-blue-50 text-blue-700 font-medium"
+                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span className="mr-1">{item.icon}</span>
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {userName && (
+            <span className="text-sm text-slate-500">{userName}</span>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            로그아웃
+          </button>
+        </div>
+      </div>
+    </nav>
+  );
+}
