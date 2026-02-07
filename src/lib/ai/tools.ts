@@ -588,7 +588,18 @@ async function addTaskNote(
     .single();
 
   if (error) return { success: false, error: error.message };
-  return { success: true, data };
+
+  const savedNotes = Array.isArray(data.notes) ? data.notes : [];
+  return {
+    success: true,
+    data: {
+      id: data.id,
+      title: data.title,
+      status: data.status,
+      total_notes: savedNotes.length,
+      has_image: !!(attachImage && mediaUrl),
+    },
+  };
 }
 
 interface PersonaFact {
