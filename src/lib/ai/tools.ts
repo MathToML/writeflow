@@ -27,7 +27,7 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
         context_type: {
           type: SchemaType.STRING,
           description:
-            "One of: location_dependent, desk_work, communication, errand, quick, other",
+            "One of: computer (PC work), phone (calls/messages), errand (outside), home, meeting, quick (under 5min), focus (deep work), waiting (blocked on others), other",
         },
         due_date: {
           type: SchemaType.STRING,
@@ -163,7 +163,7 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "create_record",
     description:
-      "Save a record/note — reference info, contacts, procedures, shopping lists, etc.",
+      "Save a record/note — reference info, contacts, procedures, shopping lists, images, etc. Set attach_image to true to save the current image with the record.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -180,6 +180,11 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
         tags: {
           type: SchemaType.ARRAY,
           items: { type: SchemaType.STRING },
+        },
+        attach_image: {
+          type: SchemaType.BOOLEAN,
+          description:
+            "Set to true to attach the current image to this record.",
         },
       },
       required: ["title"],
@@ -247,7 +252,7 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "add_task_note",
     description:
-      "Add a progress note/comment to an existing task. Use when user reports progress or wants to record something about a task.",
+      "Add a progress note/comment to an existing task. Use when user reports progress or wants to record something about a task. Set attach_image to true to attach the current image.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -263,6 +268,11 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
           type: SchemaType.STRING,
           description:
             "Optionally update status simultaneously. One of: pending, in_progress, done, deferred",
+        },
+        attach_image: {
+          type: SchemaType.BOOLEAN,
+          description:
+            "Set to true to attach the current image to this note. The image URL will be added automatically.",
         },
       },
       required: ["task_id", "note"],
@@ -280,6 +290,7 @@ export async function executeTool(
   supabase: SupabaseClient<Database>,
   userId: string,
   dumpId: string | null,
+  mediaUrl?: string,
 ): Promise<ToolResult> {
   switch (name) {
     case "create_task":
@@ -295,11 +306,11 @@ export async function executeTool(
     case "list_events":
       return listEvents(args, supabase, userId);
     case "create_record":
-      return createRecord(args, supabase, userId, dumpId);
+      return createRecord(args, supabase, userId, dumpId, mediaUrl);
     case "search_records":
       return searchRecords(args, supabase, userId);
     case "add_task_note":
-      return addTaskNote(args, supabase, userId);
+      return addTaskNote(args, supabase, userId, mediaUrl);
     case "update_persona":
       return updatePersona(args, supabase, userId);
     case "search_history":
@@ -374,6 +385,7 @@ async function listTasks(
     .from("tasks")
     .select("id, title, status, importance, due_date, context_type")
     .eq("user_id", userId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true })
     .limit(20);
 
@@ -479,7 +491,13 @@ async function createRecord(
   supabase: SupabaseClient<Database>,
   userId: string,
   dumpId: string | null,
+  mediaUrl?: string,
 ): Promise<ToolResult> {
+  const attachImage = args.attach_image as boolean | undefined;
+  const contentObj: Record<string, unknown> = {};
+  if (args.content) contentObj.description = args.content;
+  if (attachImage && mediaUrl) contentObj.media_url = mediaUrl;
+
   const { data, error } = await supabase
     .from("records")
     .insert({
@@ -487,7 +505,7 @@ async function createRecord(
       dump_id: dumpId,
       title: args.title as string,
       category: (args.category as string) ?? "general",
-      content: (args.content ? { description: args.content } : {}) as Json,
+      content: (Object.keys(contentObj).length > 0 ? contentObj : {}) as Json,
       tags: (args.tags as string[]) ?? [],
     })
     .select("id, title, category, tags")
@@ -523,9 +541,11 @@ async function addTaskNote(
   args: Record<string, unknown>,
   supabase: SupabaseClient<Database>,
   userId: string,
+  mediaUrl?: string,
 ): Promise<ToolResult> {
   const taskId = args.task_id as string;
   const noteText = args.note as string;
+  const attachImage = args.attach_image as boolean | undefined;
 
   // Read current notes
   const { data: currentTask, error: fetchError } = await supabase
@@ -538,11 +558,15 @@ async function addTaskNote(
   if (fetchError) return { success: false, error: fetchError.message };
 
   const currentNotes =
-    (currentTask.notes as { text: string; created_at: string }[] | null) ?? [];
-  const updatedNotes = [
-    ...currentNotes,
-    { text: noteText, created_at: new Date().toISOString() },
-  ];
+    (currentTask.notes as { text: string; created_at: string; media_url?: string }[] | null) ?? [];
+  const newNote: { text: string; created_at: string; media_url?: string } = {
+    text: noteText,
+    created_at: new Date().toISOString(),
+  };
+  if (attachImage && mediaUrl) {
+    newNote.media_url = mediaUrl;
+  }
+  const updatedNotes = [...currentNotes, newNote];
 
   // Build update
   const updates: Record<string, unknown> = {
@@ -643,6 +667,7 @@ async function searchHistory(
       .from("tasks")
       .select("id, title, status, due_date, completed_at, description")
       .eq("user_id", userId)
+      .is("deleted_at", null)
       .gte("created_at", cutoff)
       .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
       .order("created_at", { ascending: false })

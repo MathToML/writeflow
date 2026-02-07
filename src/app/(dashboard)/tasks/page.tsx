@@ -16,6 +16,7 @@ export default async function TasksPage() {
       .from("tasks")
       .select("*")
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .in("status", ["pending", "in_progress"])
       .order("importance", { ascending: false })
       .order("created_at", { ascending: true }),
@@ -23,6 +24,7 @@ export default async function TasksPage() {
       .from("tasks")
       .select("*")
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .eq("status", "done")
       .order("completed_at", { ascending: false })
       .limit(20),

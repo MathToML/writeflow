@@ -2,7 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { runAgent } from "@/lib/ai/agent";
 import { NextResponse } from "next/server";
 import type { Json } from "@/types/database";
+import type { Database } from "@/types/database";
 import type { Content } from "@google/generative-ai";
+
+const VALID_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_BASE64_SIZE = 7_000_000; // ~5MB binary
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -14,21 +18,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { message, timezone, history } = await request.json();
+  const { message, timezone, history, image } = await request.json() as {
+    message?: string;
+    timezone?: string;
+    history?: { role: string; content: string }[];
+    image?: { base64: string; mimeType: string };
+  };
 
-  if (!message || typeof message !== "string") {
-    return NextResponse.json({ error: "Message required" }, { status: 400 });
+  const hasImage = !!image;
+  const hasText = !!message && typeof message === "string" && message.trim().length > 0;
+
+  if (!hasText && !hasImage) {
+    return NextResponse.json({ error: "Message or image required" }, { status: 400 });
+  }
+
+  // Validate image
+  if (image) {
+    if (!VALID_IMAGE_TYPES.includes(image.mimeType)) {
+      return NextResponse.json({ error: "Unsupported image type" }, { status: 400 });
+    }
+    if (image.base64.length > MAX_BASE64_SIZE) {
+      return NextResponse.json({ error: "Image too large (max 5MB)" }, { status: 400 });
+    }
   }
 
   const userTimezone = timezone || "Asia/Seoul";
+  const textContent = message?.trim() || (hasImage ? "[이미지]" : "");
 
-  // 1. Save raw dump (always preserved regardless of AI outcome)
+  // 1. Save raw dump
   const { data: dump, error: dumpError } = await supabase
     .from("dumps")
     .insert({
       user_id: user.id,
-      type: "text" as const,
-      raw_content: message,
+      type: (hasImage ? "image" : "text") as Database["public"]["Enums"]["dump_type"],
+      raw_content: textContent,
     })
     .select()
     .single();
@@ -40,7 +63,36 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. Format current datetime in user's timezone
+  // 2. Upload image to Storage if present
+  let mediaUrl: string | null = null;
+  if (image && dump) {
+    const ext = image.mimeType.split("/")[1];
+    const path = `${user.id}/${dump.id}.${ext}`;
+    const buffer = Buffer.from(image.base64, "base64");
+
+    const { error: uploadError } = await supabase.storage
+      .from("dump-images")
+      .upload(path, buffer, {
+        contentType: image.mimeType,
+        upsert: false,
+      });
+
+    if (!uploadError) {
+      // Private bucket — use signed URL (1 year)
+      const { data: signedData } = await supabase.storage
+        .from("dump-images")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+
+      mediaUrl = signedData?.signedUrl || null;
+
+      await supabase
+        .from("dumps")
+        .update({ media_url: mediaUrl })
+        .eq("id", dump.id);
+    }
+  }
+
+  // 3. Format current datetime in user's timezone
   const now = new Date();
   const currentDateTime = now
     .toLocaleString("en-CA", {
@@ -55,25 +107,31 @@ export async function POST(request: Request) {
     })
     .replace(",", "");
 
-  // 3. Convert client history to Gemini Content format
+  // 4. Convert client history to Gemini Content format
   const geminiHistory: Content[] = (
-    (history as { role: string; content: string }[]) ?? []
+    (history ?? [])
   ).map((h) => ({
     role: h.role === "user" ? ("user" as const) : ("model" as const),
     parts: [{ text: h.content }],
   }));
 
-  // 4. Run agent
+  // 5. Run agent
   try {
-    const result = await runAgent(message, geminiHistory, {
-      userId: user.id,
-      dumpId: dump.id,
-      supabase,
-      timezone: userTimezone,
-      currentDateTime,
-    });
+    const result = await runAgent(
+      message?.trim() || "",
+      geminiHistory,
+      {
+        userId: user.id,
+        dumpId: dump.id,
+        supabase,
+        timezone: userTimezone,
+        currentDateTime,
+        mediaUrl: mediaUrl || undefined,
+      },
+      image ? { base64: image.base64, mimeType: image.mimeType } : undefined,
+    );
 
-    // 5. Store AI response in dump
+    // 6. Store AI response in dump
     await supabase
       .from("dumps")
       .update({
@@ -87,6 +145,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: result.message,
       dumpId: dump.id,
+      mediaUrl,
     });
   } catch (error) {
     // AI failure — dump is preserved
@@ -103,6 +162,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: "죄송해요, 처리 중 문제가 생겼어요. 다시 시도해 주세요.",
       dumpId: dump.id,
+      mediaUrl,
     });
   }
 }

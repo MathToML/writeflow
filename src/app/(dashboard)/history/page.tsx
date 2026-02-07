@@ -8,6 +8,7 @@ interface Dump {
   type: string;
   ai_analysis: Record<string, unknown> | null;
   created_at: string;
+  media_url?: string | null;
 }
 
 export default async function HistoryPage() {
@@ -98,6 +99,13 @@ export default async function HistoryPage() {
                           <p className="text-sm font-medium text-slate-800 mt-1">
                             {classTitle}
                           </p>
+                        )}
+                        {dump.media_url && (
+                          <img
+                            src={dump.media_url}
+                            alt="첨부 이미지"
+                            className="mt-2 max-w-[200px] rounded-lg border border-slate-200"
+                          />
                         )}
                         <p className="text-sm text-slate-500 mt-1 whitespace-pre-wrap">
                           {dump.raw_content}

@@ -19,13 +19,29 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { taskId, status, note } = await request.json();
+  const { taskId, status, note, restore } = await request.json();
 
   if (!taskId) {
     return NextResponse.json(
       { error: "taskId required" },
       { status: 400 },
     );
+  }
+
+  // Restore a soft-deleted task
+  if (restore) {
+    const { data, error } = await supabase
+      .from("tasks")
+      .update({ deleted_at: null } as Database["public"]["Tables"]["tasks"]["Update"])
+      .eq("id", taskId)
+      .eq("user_id", user.id)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ task: data });
   }
 
   if (!status && !note) {
@@ -84,8 +100,42 @@ export async function PATCH(request: Request) {
     .from("tasks")
     .select("*", { count: "exact", head: true })
     .eq("user_id", user.id)
+    .is("deleted_at", null)
     .eq("status", "done")
     .gte("completed_at", todayStart.toISOString());
 
   return NextResponse.json({ task: data, todayCompleted: count ?? 0 });
+}
+
+export async function DELETE(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { taskId } = await request.json();
+
+  if (!taskId) {
+    return NextResponse.json(
+      { error: "taskId required" },
+      { status: 400 },
+    );
+  }
+
+  const { error } = await supabase
+    .from("tasks")
+    .update({ deleted_at: new Date().toISOString() } as Database["public"]["Tables"]["tasks"]["Update"])
+    .eq("id", taskId)
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

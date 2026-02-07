@@ -36,6 +36,8 @@ interface Dump {
   raw_content: string;
   ai_analysis: unknown;
   created_at: string;
+  type?: string;
+  media_url?: string | null;
 }
 
 interface DashboardClientProps {
@@ -73,10 +75,11 @@ export default function DashboardClient({
     reason: string;
   } | null>(serverRecommendation);
   const [isLoadingOTTD, setIsLoadingOTTD] = useState(false);
+  const [wellnessMessage, setWellnessMessage] = useState<string | null>(null);
 
   // Fetch AI recommendation on cache miss
   const fetchRecommendation = useCallback(async () => {
-    if (aiRecommendation || !hasCandidates) return;
+    if (aiRecommendation || wellnessMessage) return;
     setIsLoadingOTTD(true);
     try {
       const res = await fetch("/api/recommend", {
@@ -87,7 +90,9 @@ export default function DashboardClient({
         }),
       });
       const data = await res.json();
-      if (data.recommendation) {
+      if (data.wellness) {
+        setWellnessMessage(data.wellness);
+      } else if (data.recommendation) {
         setAiRecommendation(data.recommendation);
       }
     } catch {
@@ -95,14 +100,14 @@ export default function DashboardClient({
     } finally {
       setIsLoadingOTTD(false);
     }
-  }, [aiRecommendation, hasCandidates]);
+  }, [aiRecommendation, wellnessMessage]);
 
   // Auto-fetch when OTTD is shown but no recommendation yet
   useEffect(() => {
-    if (showOTTD && !aiRecommendation && hasCandidates) {
+    if (showOTTD && !aiRecommendation && !wellnessMessage && hasCandidates) {
       fetchRecommendation();
     }
-  }, [showOTTD, aiRecommendation, hasCandidates, fetchRecommendation]);
+  }, [showOTTD, aiRecommendation, wellnessMessage, hasCandidates, fetchRecommendation]);
 
   const handleEventClick = (event: Event) => {
     setEditingEvent(event as EventData);
@@ -163,7 +168,11 @@ export default function DashboardClient({
             {showOTTD ? "✕ 닫기" : "지금 뭐 할까? 🤔"}
           </button>
 
-          {showOTTD && aiRecommendation ? (
+          {showOTTD && wellnessMessage ? (
+            <div className="mt-3 p-6 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl text-center space-y-2 animate-in">
+              <p className="text-lg text-amber-800 font-medium">{wellnessMessage}</p>
+            </div>
+          ) : showOTTD && aiRecommendation ? (
             <div className="mt-3 animate-in">
               <OneThingCard
                 task={aiRecommendation.task}

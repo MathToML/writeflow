@@ -46,6 +46,7 @@ export const generateDailySummary = inngest.createFunction(
           .from("tasks")
           .select("*", { count: "exact", head: true })
           .eq("user_id", userId)
+          .is("deleted_at", null)
           .eq("status", "done")
           .gte("completed_at", yesterdayStart)
           .lte("completed_at", yesterdayEnd);

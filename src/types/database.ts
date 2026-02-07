@@ -55,6 +55,7 @@ export type Database = {
           created_at: string
           id: string
           location: unknown
+          media_url: string | null
           raw_content: string
           transcript: string | null
           type: Database["public"]["Enums"]["dump_type"]
@@ -65,6 +66,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: unknown
+          media_url?: string | null
           raw_content: string
           transcript?: string | null
           type?: Database["public"]["Enums"]["dump_type"]
@@ -75,6 +77,7 @@ export type Database = {
           created_at?: string
           id?: string
           location?: unknown
+          media_url?: string | null
           raw_content?: string
           transcript?: string | null
           type?: Database["public"]["Enums"]["dump_type"]
@@ -251,6 +254,7 @@ export type Database = {
           completed_at: string | null
           context_type: Database["public"]["Enums"]["context_type"] | null
           created_at: string
+          deleted_at: string | null
           description: string | null
           due_date: string | null
           dump_id: string | null
@@ -269,6 +273,7 @@ export type Database = {
           completed_at?: string | null
           context_type?: Database["public"]["Enums"]["context_type"] | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           dump_id?: string | null
@@ -287,6 +292,7 @@ export type Database = {
           completed_at?: string | null
           context_type?: Database["public"]["Enums"]["context_type"] | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           due_date?: string | null
           dump_id?: string | null
@@ -334,12 +340,18 @@ export type Database = {
     }
     Enums: {
       context_type:
+        | "computer"
+        | "phone"
+        | "errand"
+        | "home"
+        | "meeting"
+        | "quick"
+        | "focus"
+        | "waiting"
+        | "other"
         | "location_dependent"
         | "desk_work"
         | "communication"
-        | "errand"
-        | "quick"
-        | "other"
       dump_type: "text" | "voice" | "image"
       event_status: "active" | "cancelled" | "completed"
       task_status: "pending" | "in_progress" | "done" | "deferred"
@@ -471,12 +483,18 @@ export const Constants = {
   public: {
     Enums: {
       context_type: [
+        "computer",
+        "phone",
+        "errand",
+        "home",
+        "meeting",
+        "quick",
+        "focus",
+        "waiting",
+        "other",
         "location_dependent",
         "desk_work",
         "communication",
-        "errand",
-        "quick",
-        "other",
       ],
       dump_type: ["text", "voice", "image"],
       event_status: ["active", "cancelled", "completed"],

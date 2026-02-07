@@ -3,18 +3,12 @@
 import { useRouter } from "next/navigation";
 import TaskItem, { type TaskItemData } from "@/components/TaskItem";
 
-interface CompletedTask {
-  id: string;
-  title: string;
-  completed_at: string | null;
-}
-
 export default function TasksPageClient({
   pendingTasks,
   completedTasks,
 }: {
   pendingTasks: TaskItemData[];
-  completedTasks: CompletedTask[];
+  completedTasks: TaskItemData[];
 }) {
   const router = useRouter();
   const refresh = () => router.refresh();
@@ -47,25 +41,9 @@ export default function TasksPageClient({
           <h2 className="text-sm font-medium text-slate-500">
             완료 ({completedTasks.length})
           </h2>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {completedTasks.map((task) => (
-              <div
-                key={task.id}
-                className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl"
-              >
-                <span className="text-green-500 text-sm">✓</span>
-                <span className="text-sm text-slate-400 line-through flex-1 truncate">
-                  {task.title}
-                </span>
-                {task.completed_at && (
-                  <span className="text-xs text-slate-300">
-                    {new Date(task.completed_at).toLocaleDateString("ko-KR", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                )}
-              </div>
+              <TaskItem key={task.id} task={task} onTaskUpdate={refresh} />
             ))}
           </div>
         </div>

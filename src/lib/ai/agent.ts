@@ -12,6 +12,12 @@ export interface AgentContext {
   supabase: SupabaseClient<Database>;
   timezone: string;
   currentDateTime: string;
+  mediaUrl?: string;
+}
+
+export interface ImageData {
+  base64: string;
+  mimeType: string;
 }
 
 interface AgentResult {
@@ -21,7 +27,7 @@ interface AgentResult {
 
 // ── System prompt ──────────────────────────────────────────────────────
 
-type TaskRow = { id: string; title: string; status: string; due_date: string | null; importance: number | null; notes: unknown; completed_at?: string | null };
+type TaskRow = { id: string; title: string; description: string | null; status: string; due_date: string | null; importance: number | null; notes: unknown; completed_at?: string | null };
 type EventRow = { id: string; title: string; start_at: string; location: string | null; description: string | null; is_all_day: boolean | null; recurrence_rule: string | null };
 type RecordRow = { id: string; title: string; category: string | null };
 
@@ -46,6 +52,7 @@ function buildSystemPrompt(
       ? activeTasks
           .map((t) => {
             let line = `- [${t.id}] "${t.title}" (${t.status}${t.due_date ? `, 마감: ${t.due_date}` : ""}${t.importance ? `, 중요도: ${t.importance}` : ""})`;
+            if (t.description) line += `\n  - 설명: ${t.description}`;
             const notes = Array.isArray(t.notes) ? t.notes as { text: string; created_at: string }[] : [];
             if (notes.length > 0) {
               const older = notes.length > 3 ? notes.length - 3 : 0;
@@ -61,7 +68,11 @@ function buildSystemPrompt(
   const completedTaskLines =
     completedTasks.length > 0
       ? completedTasks
-          .map((t) => `- [${t.id}] "${t.title}" (완료${t.completed_at ? `: ${t.completed_at.slice(0, 10)}` : ""})`)
+          .map((t) => {
+            let line = `- [${t.id}] "${t.title}" (완료${t.completed_at ? `: ${t.completed_at.slice(0, 10)}` : ""})`;
+            if (t.description) line += `\n  - 설명: ${t.description}`;
+            return line;
+          })
           .join("\n")
       : "(없음)";
 
@@ -136,7 +147,7 @@ ${personaFacts.length > 0
 ## 행동 규칙
 1. 사용자 입력을 분석하여 적절한 도구를 호출하세요
 2. 여러 항목이 있으면 여러 도구를 호출하세요
-3. 기존 항목의 업데이트인지 새 항목인지 반드시 판단하세요 (위의 목록 참조)
+3. 기존 항목의 업데이트인지 새 항목인지 반드시 판단하세요 (위의 목록 참조). 제목이 정확히 일치하지 않으면 함부로 매칭하지 마세요
 4. 도구 호출 후에는 무엇을 했는지 자연스럽게 알려주세요
 5. 단순 대화(인사, 질문)에는 도구 없이 답하세요
 6. 날짜/시간이 애매하면 현재 시간 기준으로 합리적으로 추론하세요
@@ -147,10 +158,25 @@ ${personaFacts.length > 0
 11. 진행 상황 보고와 동시에 완료를 의미하면 add_task_note에 status: done을 함께 전달하세요
 12. 종일 이벤트(공휴일, 기념일 등 시간 없는 일정)는 is_all_day: true로 설정하세요
 13. 반복 일정은 recurrence_rule에 RRULE 형식으로 설정하세요 (예: RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR)
-14. 위 목록에 없는 과거 할 일/일정/기록이 필요하면 search_history 도구로 검색하세요
+14. **중요** 사용자가 키워드로 태스크를 언급할 때 (예: "팔로알토에 넣어줘"):
+    a. 먼저 진행 중/완료 목록에서 **정확히** 일치하는 항목을 찾으세요
+    b. 정확히 일치하는 게 없으면 반드시 search_history 도구로 검색하세요
+    c. 한국어로 검색해서 못 찾으면 영어로도 검색하세요 (예: "팔로알토" → "Palo Alto", "빅토리아" → "Victoria")
+    d. 비슷한 이름이라도 다른 항목에 넣지 마세요 (예: "Los Altos" ≠ "Palo Alto")
+    e. 검색 후에도 확실하지 않으면 사용자에게 확인하세요
+    f. 완료된 태스크에도 노트를 추가할 수 있으니, done 상태라고 무시하지 마세요
 15. 사용자가 개인 정보를 언급하면 update_persona로 저장하세요 (가족 이름, 직장, 습관, 취미, 건강 등)
 16. 이미 알고 있는 정보가 변경되면 같은 category/key로 update_persona를 호출하여 갱신하세요
-17. 저장할 때 티내지 말고 자연스럽게 대화를 이어가세요 — "기억해둘게요" 같은 말은 하지 마세요`;
+17. 저장할 때 티내지 말고 자연스럽게 대화를 이어가세요 — "기억해둘게요" 같은 말은 하지 마세요
+18. 사용자가 이미지를 보내면 내용을 분석하고 상황에 맞게 처리하세요:
+    - 기존 할 일과 관련 → add_task_note(attach_image: true)로 이미지와 분석 내용을 노트로 추가
+    - 새 할 일 → create_task 후 add_task_note(attach_image: true)로 이미지 첨부
+    - 일정 관련 → create_event 또는 update_event
+    - 사용자의 의도가 불분명하면 물어보세요
+    - 아무 지시 없이 이미지만 보내면 create_record(attach_image: true)로 기록 저장
+19. attach_image: true를 사용하면 현재 이미지가 자동으로 첨부됩니다
+20. 이미지 분석 시 상세 내용(OCR, 장소, 날짜, 가격 등)은 노트/기록에 저장하되, 사용자에게는 무엇을 했는지만 간결하게 알려주세요. 추출한 텍스트를 응답에 그대로 나열하지 마세요
+21. 사용자가 "삭제해", "지워줘" 등의 표현을 쓰면 직접 삭제하지 말고, 화면에서 삭제 버튼을 사용하라고 안내하세요`;
 }
 
 // ── SDK adapter helpers ────────────────────────────────────────────────
@@ -215,6 +241,7 @@ export async function runAgent(
   message: string,
   history: Content[],
   context: AgentContext,
+  imageData?: ImageData,
 ): Promise<AgentResult> {
   const { type, model } = getModel();
 
@@ -229,18 +256,20 @@ export async function runAgent(
   ] = await Promise.all([
     context.supabase
       .from("tasks")
-      .select("id, title, status, due_date, importance, notes")
+      .select("id, title, description, status, due_date, importance, notes")
       .eq("user_id", context.userId)
+      .is("deleted_at", null)
       .in("status", ["pending", "in_progress"])
       .order("created_at", { ascending: true })
       .limit(20),
     context.supabase
       .from("tasks")
-      .select("id, title, status, due_date, importance, notes, completed_at")
+      .select("id, title, description, status, due_date, importance, notes, completed_at")
       .eq("user_id", context.userId)
+      .is("deleted_at", null)
       .eq("status", "done")
       .order("completed_at", { ascending: false })
-      .limit(5),
+      .limit(15),
     context.supabase
       .from("events")
       .select("id, title, start_at, location, description, is_all_day, recurrence_rule")
@@ -306,7 +335,18 @@ export async function runAgent(
 
   // 4. Tool call loop
   const toolCalls: { name: string; args: object }[] = [];
-  let currentMessage: string | Part[] = message;
+  let currentMessage: string | Part[];
+
+  if (imageData) {
+    // Build multimodal message with image + text
+    const parts: Part[] = [
+      { inlineData: { mimeType: imageData.mimeType, data: imageData.base64 } },
+      { text: message || "이 이미지를 분석해주세요. 할 일, 일정, 또는 기록할 내용이 있으면 처리해주세요." },
+    ];
+    currentMessage = parts;
+  } else {
+    currentMessage = message;
+  }
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -330,6 +370,7 @@ export async function runAgent(
         context.supabase,
         context.userId,
         context.dumpId,
+        context.mediaUrl,
       );
       functionResponses.push({
         functionResponse: {

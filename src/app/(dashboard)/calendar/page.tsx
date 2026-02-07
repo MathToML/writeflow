@@ -38,6 +38,7 @@ export default async function CalendarPage() {
         .from("tasks")
         .select("id, title, due_date, status, importance")
         .eq("user_id", user.id)
+        .is("deleted_at", null)
         .not("due_date", "is", null)
         .in("status", ["pending", "in_progress"])
         .order("due_date", { ascending: true }),

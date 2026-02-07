@@ -54,17 +54,19 @@ export default async function DashboardPage() {
       .from("tasks")
       .select("*")
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .in("status", ["pending", "in_progress"])
       .order("created_at", { ascending: true }),
     supabase
       .from("tasks")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
+      .is("deleted_at", null)
       .eq("status", "done")
       .gte("completed_at", todayStart.toISOString()),
     supabase
       .from("dumps")
-      .select("id, raw_content, ai_analysis, created_at")
+      .select("id, raw_content, ai_analysis, created_at, type, media_url")
       .eq("user_id", user.id)
       .gte("created_at", todayStart.toISOString())
       .lte("created_at", todayEnd.toISOString())

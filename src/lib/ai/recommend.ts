@@ -160,20 +160,25 @@ export function scoreCandidates(
 
     // Context type scoring
     switch (task.context_type) {
+      case "phone":
       case "communication":
         score += 15;
         break;
       case "quick":
         score += 10;
         break;
+      case "computer":
       case "desk_work":
+      case "focus":
         score += 5;
         break;
       case "errand":
       case "location_dependent":
         score += 5;
-        // Bonus if there's an outing today
         if (hasOutingToday) score += 10;
+        break;
+      case "waiting":
+        score -= 5;
         break;
     }
 
@@ -270,6 +275,8 @@ ${candidateLines}
 - 이유는 1-2문장, 따뜻하고 평온한 톤
 - 진행 중인 작업이 있다면 이어하는 것이 자연스러울 수 있어요
 - 외출 일정이 있다면 그 전에 외출 관련 할 일을 먼저 추천할 수도 있어요
+- 점심시간(11:30-13:00)이면 "식사는 하셨어요?" 같은 따뜻한 한마디를 reason에 자연스럽게 녹여주세요
+- 늦은 저녁(22시 이후)이면 무리하지 말라는 톤으로, 가벼운 일만 추천하세요
 
 반드시 아래 JSON 형식으로만 응답하세요:
 {"task_id": "선택한 후보의 UUID", "reason": "추천 이유"}`;
@@ -315,10 +322,12 @@ function fallbackReason(task: Task): string {
     return "마감이 조금 지났지만, 지금 해도 충분해요.";
   if (task.status === "in_progress")
     return "하던 일을 이어서 하면 좋겠어요.";
-  if (task.context_type === "communication")
+  if (task.context_type === "phone" || task.context_type === "communication")
     return "먼저 보내두면 답을 기다리는 동안 다른 일을 할 수 있어요.";
   if (task.context_type === "quick")
     return "금방 끝나는 일이에요. 가볍게 해치워볼까요?";
+  if (task.context_type === "focus")
+    return "집중이 필요한 일이에요. 지금 조용할 때 해볼까요?";
   if (task.importance && task.importance >= 4)
     return "중요한 일이니 지금 집중해보면 좋겠어요.";
   return "다음으로 하기 좋은 일이에요.";
