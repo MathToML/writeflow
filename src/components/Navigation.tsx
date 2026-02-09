@@ -6,12 +6,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: "🎯" },
-  { href: "/calendar", label: "Calendar", icon: "📅" },
-  { href: "/tasks", label: "Tasks", icon: "✅" },
-  { href: "/expenses", label: "Expenses", icon: "💰" },
-  { href: "/habits", label: "Habits", icon: "🔥" },
-  { href: "/history", label: "History", icon: "📋" },
+  { href: "/", label: "Home" },
+  { href: "/calendar", label: "Calendar" },
+  { href: "/tasks", label: "Tasks" },
+  { href: "/expenses", label: "Expenses" },
+  { href: "/habits", label: "Habits" },
+  { href: "/history", label: "History" },
 ];
 
 export default function Navigation({ userName }: { userName?: string }) {
@@ -26,31 +26,28 @@ export default function Navigation({ userName }: { userName?: string }) {
 
   return (
     <nav className="border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="font-bold text-slate-900">
+      <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <Link href="/" className="font-bold text-slate-900 mr-4 shrink-0">
             OTTD
           </Link>
-          <div className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-2 py-1.5 rounded-lg text-sm transition-all ${
-                  pathname === item.href
-                    ? "bg-blue-50 text-blue-700 font-medium"
-                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <span className="mr-1">{item.icon}</span>
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`px-2.5 py-1.5 rounded-lg text-sm whitespace-nowrap transition-all ${
+                pathname === item.href
+                  ? "bg-blue-50 text-blue-700 font-medium"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0 ml-4">
           {userName && (
-            <span className="text-sm text-slate-500">{userName}</span>
+            <span className="text-sm text-slate-500 whitespace-nowrap">{userName}</span>
           )}
           <button
             onClick={handleLogout}
