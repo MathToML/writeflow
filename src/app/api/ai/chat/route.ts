@@ -45,6 +45,15 @@ export async function POST(request: Request) {
   const userTimezone = timezone || "Asia/Seoul";
   const textContent = message?.trim() || (hasImage ? "[Image]" : "");
 
+  // Resolve any pending questions — user has responded
+  if (textContent !== "[AUTO_PROCEED]") {
+    await supabase
+      .from("pending_questions")
+      .update({ status: "resolved", resolved_at: new Date().toISOString() })
+      .eq("user_id", user.id)
+      .eq("status", "pending");
+  }
+
   // 1. Save raw dump
   const { data: dump, error: dumpError } = await supabase
     .from("dumps")
@@ -143,11 +152,38 @@ export async function POST(request: Request) {
       })
       .eq("id", dump.id);
 
-    console.log("[Chat API] Agent result. toolCalls:", result.toolCalls.map((tc) => tc.name), "message:", result.message.slice(0, 100));
+    // 7. If AI needs user input, create pending question + schedule auto-proceed
+    if (result.needsUserInput) {
+      const { data: pq } = await supabase
+        .from("pending_questions")
+        .insert({
+          user_id: user.id,
+          dump_id: dump.id,
+          timezone: userTimezone,
+        })
+        .select("id")
+        .single();
+
+      if (pq) {
+        const { inngest } = await import("@/inngest/client");
+        await inngest.send({
+          name: "ai/auto-proceed",
+          data: {
+            pendingQuestionId: pq.id,
+            userId: user.id,
+            dumpId: dump.id,
+            timezone: userTimezone,
+          },
+        });
+      }
+    }
+
+    console.log("[Chat API] Agent result. toolCalls:", result.toolCalls.map((tc) => tc.name), "message:", result.message.slice(0, 100), "needsUserInput:", result.needsUserInput);
     return NextResponse.json({
       message: result.message,
       dumpId: dump.id,
       mediaUrl,
+      needsUserInput: result.needsUserInput,
     });
   } catch (error) {
     // AI failure — dump is preserved

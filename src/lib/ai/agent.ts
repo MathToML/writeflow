@@ -23,6 +23,7 @@ export interface ImageData {
 interface AgentResult {
   message: string;
   toolCalls: { name: string; args: object }[];
+  needsUserInput: boolean;
 }
 
 // ── System prompt ──────────────────────────────────────────────────────
@@ -30,6 +31,9 @@ interface AgentResult {
 type TaskRow = { id: string; title: string; description: string | null; status: string; due_date: string | null; importance: number | null; notes: unknown; completed_at?: string | null };
 type EventRow = { id: string; title: string; start_at: string; location: string | null; description: string | null; is_all_day: boolean | null; recurrence_rule: string | null };
 type RecordRow = { id: string; title: string; category: string | null };
+type ExpenseRow = { id: string; title: string; content: unknown; occurred_at: string | null };
+type HabitRow = { id: string; name: string; description: string | null; icon: string | null };
+type HabitLogRow = { id: string; habit_id: string; logged_date: string; note: string | null; value: number | null };
 
 interface PersonaFact {
   category: string;
@@ -44,8 +48,12 @@ function buildSystemPrompt(
   upcomingEvents: EventRow[],
   pastEvents: EventRow[],
   recentRecords: RecordRow[],
+  recentExpenses: ExpenseRow[],
   userName: string,
   personaFacts: PersonaFact[],
+  habits: HabitRow[],
+  todayHabitLogs: HabitLogRow[],
+  recentHabitLogs: HabitLogRow[],
 ): string {
   const taskLines =
     activeTasks.length > 0
@@ -109,14 +117,15 @@ function buildSystemPrompt(
           .join("\n")
       : "(none)";
 
-  return `You are the OTTD (One Thing To Do) AI assistant.
-You manage tasks, events, and records for ${userName}.
+  return `You are the OTTD (One Thing To Do) AI assistant for ${userName}.
+Your mission is to help ${userName} stay calm and focused amid a busy life. You organize their tasks, events, and records — but more importantly, you protect their mental wellness by cutting through overwhelm and gently guiding them to focus on just one thing at a time. You help prevent burnout, ease the pressure of too many responsibilities, and make productivity feel lighter.
 
 ## Personality
-- Warm and friendly. Respond in the same language the user writes in
+- Warm, calm, and supportive — like a thoughtful friend, not a demanding boss
+- Respond in the same language the user writes in
 - **Always respond in 1-2 sentences** — never write more than 3 sentences
 - Do NOT include detailed tool result data in responses (OCR text, JSON, etc.)
-- Don't overwhelm the user
+- Never pile on more stress — reassure and simplify
 
 ## Current Time
 ${(() => {
@@ -151,6 +160,29 @@ ${pastEventLines}
 
 ### Recent Records
 ${recordLines}
+
+### Recent Expenses (last 5)
+${recentExpenses.length > 0
+    ? recentExpenses.map((e) => {
+        const c = e.content as { amount?: number; currency?: string; expense_category?: string; vendor?: string } | null;
+        const amt = c?.amount ? `${c.currency ?? "USD"} ${c.amount.toLocaleString()}` : "";
+        const cat = c?.expense_category ?? "";
+        const vendor = c?.vendor ? ` @ ${c.vendor}` : "";
+        return `- "${e.title}" ${amt} (${cat}${vendor}) ${e.occurred_at?.slice(0, 10) ?? ""}`;
+      }).join("\n")
+    : "(none)"}
+
+### Habits & Tracking
+${(() => {
+  if (habits.length === 0) return "(No habits yet — suggest creating one when you notice repeated activities)";
+  return habits.map((h) => {
+    const todayLog = todayHabitLogs.find((l) => l.habit_id === h.id);
+    const weekLogs = recentHabitLogs.filter((l) => l.habit_id === h.id);
+    const uniqueDays = new Set(weekLogs.map((l) => l.logged_date)).size;
+    const todayStatus = todayLog ? `✓${todayLog.note ? ` (${todayLog.note})` : ""}` : "✗";
+    return `- [${h.id}] ${h.icon ?? "✅"} ${h.name} — today: ${todayStatus} | this week: ${uniqueDays}/7 days`;
+  }).join("\n");
+})()}
 
 ### What we know about ${userName}
 ${personaFacts.length > 0
@@ -197,7 +229,24 @@ ${personaFacts.length > 0
 20. Using attach_image: true automatically attaches the current image
 21. **Image response rule**: Store detailed content (OCR, dates, prices) only in note/record text. In user response, just say something like "Added the info to your task note." Never list extracted text in the response
 22. When user says "delete" or "remove", don't delete directly — guide them to use the delete button on screen
-23. If a tool call returns success: false, inform the user about the failure. Never claim success when it didn't succeed`;
+23. If a tool call returns success: false, inform the user about the failure. Never claim success when it didn't succeed
+24. **Expense recording rules:**
+    - When user mentions spending, purchase, receipt, or price → create_expense
+    - Receipt image → analyze and create_expense(attach_image: true) — extract amount, vendor, items, date from the image
+    - Text like "점심 김밥 8000원" → create_expense(title: "김밥", amount: 8000, expense_category: "food")
+    - Always extract the numeric amount. If currency is ambiguous, default to USD
+    - If user mentions a past date ("어제 커피"), set occurred_at accordingly
+25. **Habit tracking rules:**
+    - When user reports a repeated activity (exercise, reading, meditation, etc.), check if a matching habit exists in the Habits list above
+    - If matching habit exists → call log_habit immediately
+    - If no matching habit AND this seems like a recurring activity → suggest: "좋은 시작이네요! 이걸 습관 대시보드로 만들어드릴까요? 기록이 쌓이면 히트맵으로 보여드릴게요"
+    - When user agrees → create_habit + log_habit in same turn
+    - Include streak info in response if available: "3일 연속이에요! 💪"
+    - Do NOT create duplicate habits. Match by similar name/activity
+26. **Proactive habit suggestions:**
+    - If you notice a repeated activity in recent records/tasks/conversation (e.g. running 3+ times, daily coffee, regular meditation), proactively suggest: "최근 기록을 보니 [활동]을 꾸준히 하고 계시네요. 습관 대시보드를 만들어드릴까요?"
+    - Never be pushy — just a gentle one-time suggestion. If user declines, don't suggest again
+27. When you ask a question that REQUIRES user input before you can proceed (e.g. clarification, confirmation, choice between options), prefix your response with [NEEDS_INPUT]. Do NOT use this for rhetorical questions or when you've already completed the action.`;
 }
 
 // ── SDK adapter helpers ────────────────────────────────────────────────
@@ -267,13 +316,22 @@ export async function runAgent(
   const { type, model } = getModel();
 
   // 1. Load user context in parallel
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
   const [
     { data: activeTasks },
     { data: completedTasks },
     { data: upcomingEvents },
     { data: pastEvents },
     { data: recentRecords },
+    { data: recentExpenses },
     { data: profile },
+    { data: habits },
+    { data: todayHabitLogs },
+    { data: recentHabitLogs },
   ] = await Promise.all([
     context.supabase
       .from("tasks")
@@ -310,13 +368,41 @@ export async function runAgent(
       .from("records")
       .select("id, title, category")
       .eq("user_id", context.userId)
+      .neq("category", "expense")
       .order("updated_at", { ascending: false })
       .limit(10),
+    context.supabase
+      .from("records")
+      .select("id, title, content, occurred_at")
+      .eq("user_id", context.userId)
+      .eq("category", "expense")
+      .order("occurred_at", { ascending: false })
+      .limit(5),
     context.supabase
       .from("profiles")
       .select("name, persona")
       .eq("id", context.userId)
       .single(),
+    context.supabase
+      .from("habits")
+      .select("id, name, description, icon")
+      .eq("user_id", context.userId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: true })
+      .limit(20),
+    context.supabase
+      .from("habit_logs")
+      .select("id, habit_id, logged_date, note, value")
+      .eq("user_id", context.userId)
+      .eq("logged_date", todayDate)
+      .limit(20),
+    context.supabase
+      .from("habit_logs")
+      .select("habit_id, logged_date, value")
+      .eq("user_id", context.userId)
+      .gte("logged_date", sevenDaysAgo)
+      .order("logged_date", { ascending: false })
+      .limit(50),
   ]);
 
   const userName =
@@ -334,8 +420,12 @@ export async function runAgent(
     upcomingEvents ?? [],
     pastEvents ?? [],
     recentRecords ?? [],
+    recentExpenses ?? [],
     userName,
     personaFacts,
+    (habits ?? []) as HabitRow[],
+    (todayHabitLogs ?? []) as HabitLogRow[],
+    (recentHabitLogs ?? []) as HabitLogRow[],
   );
 
   // 3. Start chat session (both SDKs support the same startChat pattern)
@@ -377,9 +467,14 @@ export async function runAgent(
 
     if (!functionCalls || functionCalls.length === 0) {
       // No more tool calls — return text
-      const text = extractText(type, result);
-      console.log("[Agent] Final text response (no tool calls). Iteration:", i);
-      return { message: text, toolCalls };
+      let text = extractText(type, result);
+      let needsUserInput = false;
+      if (text.startsWith("[NEEDS_INPUT]")) {
+        needsUserInput = true;
+        text = text.replace("[NEEDS_INPUT]", "").trimStart();
+      }
+      console.log("[Agent] Final text response (no tool calls). Iteration:", i, "needsUserInput:", needsUserInput);
+      return { message: text, toolCalls, needsUserInput };
     }
 
     // Execute all function calls
@@ -414,5 +509,6 @@ export async function runAgent(
     message:
       "That was a complex request — I've partially completed it. Let me know and I'll continue where I left off.",
     toolCalls,
+    needsUserInput: false,
   };
 }

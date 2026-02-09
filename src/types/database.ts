@@ -14,6 +14,137 @@ export type Database = {
   }
   public: {
     Tables: {
+      pending_questions: {
+        Row: {
+          id: string
+          user_id: string
+          dump_id: string
+          timezone: string
+          status: string
+          resolved_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          dump_id: string
+          timezone?: string
+          status?: string
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          dump_id?: string
+          timezone?: string
+          status?: string
+          resolved_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_questions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_questions_dump_id_fkey"
+            columns: ["dump_id"]
+            isOneToOne: false
+            referencedRelation: "dumps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habits: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string | null
+          icon: string | null
+          color: string | null
+          archived_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          color?: string | null
+          archived_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          color?: string | null
+          archived_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habit_logs: {
+        Row: {
+          id: string
+          habit_id: string
+          user_id: string
+          logged_date: string
+          note: string | null
+          value: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          habit_id: string
+          user_id: string
+          logged_date: string
+          note?: string | null
+          value?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          habit_id?: string
+          user_id?: string
+          logged_date?: string
+          note?: string | null
+          value?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habit_logs_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "habit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_summaries: {
         Row: {
           created_at: string
@@ -205,6 +336,7 @@ export type Database = {
           created_at: string
           dump_id: string | null
           id: string
+          occurred_at: string | null
           tags: string[] | null
           title: string
           updated_at: string
@@ -216,6 +348,7 @@ export type Database = {
           created_at?: string
           dump_id?: string | null
           id?: string
+          occurred_at?: string | null
           tags?: string[] | null
           title: string
           updated_at?: string
@@ -227,6 +360,7 @@ export type Database = {
           created_at?: string
           dump_id?: string | null
           id?: string
+          occurred_at?: string | null
           tags?: string[] | null
           title?: string
           updated_at?: string

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { createClient } from "@/lib/supabase/client";
 
 interface Dump {
   id: string;
@@ -107,12 +108,6 @@ export default function BrainDumpChat({
   const [mounted, setMounted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
-  const autoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastCheckedAiMsgRef = useRef<string | null>(null);
-  const messagesRef = useRef(messages);
-  messagesRef.current = messages;
-  const isLoadingRef = useRef(isLoading);
-  isLoadingRef.current = isLoading;
   const onDumpCreatedRef = useRef(onDumpCreated);
   onDumpCreatedRef.current = onDumpCreated;
 
@@ -138,67 +133,54 @@ export default function BrainDumpChat({
     }
   }, [messages, isChatOpen]);
 
-  // Clear auto-timeout helper
-  const clearAutoTimeout = useCallback(() => {
-    if (autoTimeoutRef.current) {
-      clearTimeout(autoTimeoutRef.current);
-      autoTimeoutRef.current = null;
-    }
-  }, []);
-
-  // Clean up auto-timeout on unmount
-  useEffect(() => clearAutoTimeout, [clearAutoTimeout]);
-
-  // Auto-proceed when AI asks a question and user doesn't respond within 2 min
+  // Supabase Realtime: listen for auto-proceed dumps
   useEffect(() => {
-    const lastMsg = messages[messages.length - 1];
-    if (!lastMsg || lastMsg.role !== "ai" || isLoading) return;
-    if (lastMsg.id === lastCheckedAiMsgRef.current) return;
-    lastCheckedAiMsgRef.current = lastMsg.id;
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
 
-    clearAutoTimeout();
+    const setup = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    // Detect question patterns (English + Korean since AI may respond in either language)
-    const isQuestion = /[?？]|까요|[일할건인]가요|나요/.test(lastMsg.content) || lastMsg.content.includes("?");
-    if (!isQuestion) return;
+      channel = supabase
+        .channel("auto-proceed-updates")
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "dumps",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const newDump = payload.new as Dump;
+            // Only handle auto-proceed dumps (not regular user messages)
+            if (newDump.raw_content !== "[AUTO_PROCEED]") return;
 
-    autoTimeoutRef.current = setTimeout(async () => {
-      if (isLoadingRef.current) return;
+            const analysis = newDump.ai_analysis as { response?: string } | null;
+            const responseText = analysis?.response;
+            if (!responseText) return;
 
-      setIsLoading(true);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `ai-auto-${newDump.id}`,
+                role: "ai" as const,
+                content: responseText,
+                timestamp: newDump.created_at,
+              },
+            ]);
+            onDumpCreatedRef.current?.();
+          },
+        )
+        .subscribe();
+    };
 
-      try {
-        const chatHistory = messagesRef.current.map((m) => ({
-          role: m.role === "user" ? "user" : "model",
-          content: m.content,
-        }));
-
-        const res = await fetch("/api/ai/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: "[AUTO_PROCEED]",
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            history: chatHistory,
-          }),
-        });
-
-        const data = await res.json();
-        const aiMsg: ChatMessage = {
-          id: `ai-${Date.now()}`,
-          role: "ai",
-          content: data.message,
-          timestamp: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, aiMsg]);
-        onDumpCreatedRef.current?.();
-      } catch {
-        // Silent fail — user will see AI's last question still
-      } finally {
-        setIsLoading(false);
-      }
-    }, 2 * 60 * 1000);
-  }, [messages, isLoading, clearAutoTimeout]);
+    setup();
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleImageSelect = useCallback((file: File) => {
     if (!VALID_IMAGE_TYPES.includes(file.type)) {
@@ -303,8 +285,6 @@ export default function BrainDumpChat({
     const text = input.trim();
     if (!text && !selectedImage) return;
     if (isLoading) return;
-
-    clearAutoTimeout();
 
     onChatOpenChange(true);
 

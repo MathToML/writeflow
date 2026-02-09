@@ -5,6 +5,7 @@ import {
   getCachedRecommendation,
   cacheRecommendation,
   generateAIRecommendation,
+  type LocationSignal,
 } from "@/lib/ai/recommend";
 import { NextResponse } from "next/server";
 
@@ -18,8 +19,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { timezone } = (await request.json().catch(() => ({}))) as {
+  const { timezone, locationSignal } = (await request.json().catch(() => ({}))) as {
     timezone?: string;
+    locationSignal?: LocationSignal;
   };
   const tz = timezone || "Asia/Seoul";
 
@@ -87,13 +89,13 @@ export async function POST(request: Request) {
   }
 
   // Score candidates
-  const candidates = scoreCandidates(activeTasks, events);
+  const candidates = scoreCandidates(activeTasks, events, locationSignal);
   if (candidates.length === 0) {
     return NextResponse.json({ recommendation: null });
   }
 
   // Check cache first
-  const contextHash = computeContextHash(activeTasks, events);
+  const contextHash = computeContextHash(activeTasks, events, locationSignal);
   const cached = await getCachedRecommendation(supabase, user.id, contextHash);
   if (cached) {
     const cachedTask = activeTasks.find((t) => t.id === cached.task_id);
@@ -114,6 +116,7 @@ export async function POST(request: Request) {
     events,
     tz,
     personaFacts,
+    locationSignal,
   );
 
   // Cache result

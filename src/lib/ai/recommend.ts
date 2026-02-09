@@ -7,6 +7,11 @@ type Task = Database["public"]["Tables"]["tasks"]["Row"];
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+export interface LocationSignal {
+  isMoving: boolean;
+  movementType: "stationary" | "walking" | "driving" | "unknown";
+}
+
 interface ScoredCandidate {
   task: Task;
   score: number;
@@ -55,6 +60,7 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 export function computeContextHash(
   tasks: { id: string; status: string }[],
   todayEvents: { id: string }[],
+  locationSignal?: LocationSignal,
 ): string {
   const now = new Date();
   const data = JSON.stringify({
@@ -63,6 +69,7 @@ export function computeContextHash(
     e: todayEvents.map((e) => e.id).sort(),
     d: now.toISOString().slice(0, 10),
     b: getTimeBucket(now.getHours()),
+    m: locationSignal?.isMoving ?? null,
   });
   return createHash("sha256").update(data).digest("hex").slice(0, 16);
 }
@@ -123,6 +130,7 @@ export async function cacheRecommendation(
 export function scoreCandidates(
   tasks: Task[],
   todayEvents: SimpleEvent[],
+  locationSignal?: LocationSignal,
 ): ScoredCandidate[] {
   const activeTasks = tasks.filter(
     (t) => t.status === "pending" || t.status === "in_progress",
@@ -171,11 +179,13 @@ export function scoreCandidates(
       case "desk_work":
       case "focus":
         score += 5;
+        if (locationSignal?.isMoving) score -= 10;
         break;
       case "errand":
       case "location_dependent":
         score += 5;
         if (hasOutingToday) score += 10;
+        if (locationSignal?.isMoving) score += 20;
         break;
       case "waiting":
         score -= 5;
@@ -208,6 +218,7 @@ export async function generateAIRecommendation(
   todayEvents: SimpleEvent[],
   timezone: string,
   personaFacts?: PersonaFact[],
+  locationSignal?: LocationSignal,
 ): Promise<{ taskId: string; reason: string }> {
   const now = new Date();
   const bucket = getTimeBucket(now.getHours());
@@ -265,6 +276,12 @@ ${personaFacts && personaFacts.length > 0
     ? personaFacts.map((f) => `- [${f.category}] ${f.content}`).join("\n")
     : "- (No information yet)"}
 
+## User's Current Location Context
+${locationSignal
+    ? `- Movement: ${locationSignal.movementType}
+- The user appears to be: ${locationSignal.isMoving ? "outside and moving" : "at a fixed location"}`
+    : "- Location data not available"}
+
 ## Candidates (by score)
 ${candidateLines}
 
@@ -275,6 +292,7 @@ ${candidateLines}
 - Reason should be 1-2 sentences, warm and calm tone
 - If there's a task in progress, continuing it may feel most natural
 - If there's an outing scheduled, consider recommending related prep tasks first
+- If the user is currently moving/outside, prefer errand or location-dependent tasks. Frame it naturally: "Since you're out, how about..."
 - During lunch time (11:30-13:00), weave in a warm touch like "Hope you had a good lunch!" in the reason
 - Late evening (after 10pm), use a gentle tone and only recommend light tasks
 
@@ -341,11 +359,12 @@ export async function getRecommendation(
   tasks: Task[],
   todayEvents: SimpleEvent[],
   timezone: string,
+  locationSignal?: LocationSignal,
 ): Promise<OTTDRecommendation | null> {
-  const candidates = scoreCandidates(tasks, todayEvents);
+  const candidates = scoreCandidates(tasks, todayEvents, locationSignal);
   if (candidates.length === 0) return null;
 
-  const contextHash = computeContextHash(tasks, todayEvents);
+  const contextHash = computeContextHash(tasks, todayEvents, locationSignal);
 
   // Check cache
   const cached = await getCachedRecommendation(supabase, userId, contextHash);
@@ -362,6 +381,8 @@ export async function getRecommendation(
     candidates,
     todayEvents,
     timezone,
+    undefined,
+    locationSignal,
   );
 
   // Cache the result

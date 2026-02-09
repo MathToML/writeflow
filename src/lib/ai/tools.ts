@@ -191,6 +191,112 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "create_expense",
+    description:
+      "Record an expense/spending. Use when user mentions spending money, a receipt, or a purchase. Extracts amount, vendor, and category from text or receipt images.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        title: {
+          type: SchemaType.STRING,
+          description: "Short expense title, e.g. 'Starbucks coffee'",
+        },
+        amount: {
+          type: SchemaType.NUMBER,
+          description: "Expense amount as a number (e.g. 15000)",
+        },
+        currency: {
+          type: SchemaType.STRING,
+          description: "Currency code. Default: USD. Others: EUR, JPY, KRW",
+        },
+        expense_category: {
+          type: SchemaType.STRING,
+          description:
+            "One of: food, transport, shopping, medical, culture, housing, education, other",
+        },
+        vendor: {
+          type: SchemaType.STRING,
+          description: "Store/vendor name if known",
+        },
+        items: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING },
+          description: "Individual items purchased",
+        },
+        occurred_at: {
+          type: SchemaType.STRING,
+          description:
+            "When the expense occurred. YYYY-MM-DD or ISO datetime. Defaults to today.",
+        },
+        description: {
+          type: SchemaType.STRING,
+          description: "Additional notes about the expense",
+        },
+        attach_image: {
+          type: SchemaType.BOOLEAN,
+          description: "Set to true to attach receipt image",
+        },
+      },
+      required: ["title", "amount"],
+    },
+  },
+  {
+    name: "create_habit",
+    description:
+      "Create a new habit for tracking. Use when user wants to track a recurring activity (exercise, reading, meditation, etc.)",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        name: {
+          type: SchemaType.STRING,
+          description: "Habit name, e.g. '달리기', 'Reading', '명상'",
+        },
+        description: {
+          type: SchemaType.STRING,
+          description: "Brief description of the habit",
+        },
+        icon: {
+          type: SchemaType.STRING,
+          description: "Single emoji icon for the habit. Default: ✅",
+        },
+        color: {
+          type: SchemaType.STRING,
+          description:
+            "Heatmap color theme. One of: green, blue, purple, orange. Default: green",
+        },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "log_habit",
+    description:
+      "Log an entry for an existing habit. Records that the user performed the habit on a given date.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        habit_id: {
+          type: SchemaType.STRING,
+          description: "UUID of the habit to log",
+        },
+        logged_date: {
+          type: SchemaType.STRING,
+          description: "YYYY-MM-DD format. Defaults to today.",
+        },
+        note: {
+          type: SchemaType.STRING,
+          description: "Optional note, e.g. '30분', '5km'",
+        },
+        value: {
+          type: SchemaType.NUMBER,
+          description:
+            "Numeric value (count, duration in minutes, etc.). Default: 1",
+        },
+      },
+      required: ["habit_id"],
+    },
+  },
+  {
     name: "search_records",
     description: "Search existing records by keyword or category",
     parameters: {
@@ -307,6 +413,12 @@ export async function executeTool(
       return listEvents(args, supabase, userId);
     case "create_record":
       return createRecord(args, supabase, userId, dumpId, mediaUrl);
+    case "create_expense":
+      return createExpense(args, supabase, userId, dumpId, mediaUrl);
+    case "create_habit":
+      return createHabit(args, supabase, userId);
+    case "log_habit":
+      return logHabit(args, supabase, userId);
     case "search_records":
       return searchRecords(args, supabase, userId);
     case "add_task_note":
@@ -530,6 +642,65 @@ async function createRecord(
 
   if (error) return { success: false, error: error.message };
   return { success: true, data };
+}
+
+async function createExpense(
+  args: Record<string, unknown>,
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  dumpId: string | null,
+  mediaUrl?: string,
+): Promise<ToolResult> {
+  const attachImage = args.attach_image as boolean | undefined;
+  const amount = args.amount as number;
+  const currency = (args.currency as string) ?? "USD";
+  const expenseCategory = (args.expense_category as string) ?? "other";
+  const vendor = (args.vendor as string) ?? null;
+  const items = (args.items as string[]) ?? [];
+  const description = (args.description as string) ?? null;
+  const occurredAt = (args.occurred_at as string) ?? new Date().toISOString().slice(0, 10);
+
+  const contentObj: Record<string, unknown> = {
+    amount,
+    currency,
+    expense_category: expenseCategory,
+  };
+  if (vendor) contentObj.vendor = vendor;
+  if (items.length > 0) contentObj.items = items;
+  if (description) contentObj.description = description;
+  if (attachImage && mediaUrl) contentObj.media_url = mediaUrl;
+
+  // Normalize occurred_at: date-only → noon UTC
+  let parsedOccurredAt = occurredAt;
+  if (occurredAt.length === 10) {
+    parsedOccurredAt = `${occurredAt}T12:00:00Z`;
+  }
+
+  const { data, error } = await supabase
+    .from("records")
+    .insert({
+      user_id: userId,
+      dump_id: dumpId,
+      title: args.title as string,
+      category: "expense",
+      content: contentObj as Json,
+      tags: [expenseCategory],
+      occurred_at: parsedOccurredAt,
+    })
+    .select("id, title, category, tags")
+    .single();
+
+  if (error) return { success: false, error: error.message };
+
+  return {
+    success: true,
+    data: {
+      ...data,
+      amount,
+      currency,
+      expense_category: expenseCategory,
+    },
+  };
 }
 
 async function searchRecords(
@@ -786,4 +957,93 @@ async function searchHistory(
     success: true,
     data: { count: results.length, results },
   };
+}
+
+async function createHabit(
+  args: Record<string, unknown>,
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from("habits")
+    .insert({
+      user_id: userId,
+      name: args.name as string,
+      description: (args.description as string) ?? null,
+      icon: (args.icon as string) ?? "✅",
+      color: (args.color as string) ?? "green",
+    })
+    .select("id, name, description, icon, color")
+    .single();
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data };
+}
+
+async function logHabit(
+  args: Record<string, unknown>,
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<ToolResult> {
+  const habitId = args.habit_id as string;
+  const loggedDate =
+    (args.logged_date as string) ?? new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("habit_logs")
+    .insert({
+      habit_id: habitId,
+      user_id: userId,
+      logged_date: loggedDate,
+      note: (args.note as string) ?? null,
+      value: (args.value as number) ?? 1,
+    })
+    .select("id, habit_id, logged_date, note, value")
+    .single();
+
+  if (error) return { success: false, error: error.message };
+
+  // Calculate current streak
+  const streak = await calculateStreak(supabase, habitId);
+
+  return {
+    success: true,
+    data: { ...data, current_streak: streak },
+  };
+}
+
+async function calculateStreak(
+  supabase: SupabaseClient<Database>,
+  habitId: string,
+): Promise<number> {
+  // Get recent logs ordered by date descending
+  const { data: logs } = await supabase
+    .from("habit_logs")
+    .select("logged_date")
+    .eq("habit_id", habitId)
+    .order("logged_date", { ascending: false })
+    .limit(365);
+
+  if (!logs || logs.length === 0) return 0;
+
+  // Get unique dates
+  const uniqueDates = [...new Set(logs.map((l) => l.logged_date))];
+
+  let streak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < uniqueDates.length; i++) {
+    const expected = new Date(today);
+    expected.setDate(expected.getDate() - i);
+    const expectedStr = expected.toISOString().slice(0, 10);
+
+    if (uniqueDates[i] === expectedStr) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
 }

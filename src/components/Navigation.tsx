@@ -9,6 +9,8 @@ const NAV_ITEMS = [
   { href: "/", label: "Home", icon: "🎯" },
   { href: "/calendar", label: "Calendar", icon: "📅" },
   { href: "/tasks", label: "Tasks", icon: "✅" },
+  { href: "/expenses", label: "Expenses", icon: "💰" },
+  { href: "/habits", label: "Habits", icon: "🔥" },
   { href: "/history", label: "History", icon: "📋" },
 ];
 
@@ -34,7 +36,7 @@ export default function Navigation({ userName }: { userName?: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                className={`px-2 py-1.5 rounded-lg text-sm transition-all ${
                   pathname === item.href
                     ? "bg-blue-50 text-blue-700 font-medium"
                     : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"

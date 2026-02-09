@@ -7,6 +7,7 @@ import TodaySchedule from "@/components/TodaySchedule";
 import TaskList from "@/components/TaskList";
 import BrainDumpChat from "@/components/BrainDumpChat";
 import EventFormModal, { type EventData } from "@/components/EventFormModal";
+import { useLocationContext } from "@/hooks/useLocationContext";
 
 interface Task {
   id: string;
@@ -61,6 +62,7 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const router = useRouter();
   const now = new Date();
+  const { fetchLocation } = useLocationContext();
 
   const refresh = () => router.refresh();
 
@@ -82,12 +84,22 @@ export default function DashboardClient({
     if (aiRecommendation || wellnessMessage) return;
     setIsLoadingOTTD(true);
     try {
+      // Try to get location context (silent — no error if denied)
+      const location = await fetchLocation();
+      const body: Record<string, unknown> = {
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+      if (location?.isAvailable) {
+        body.locationSignal = {
+          isMoving: location.isMoving,
+          movementType: location.movementType,
+        };
+      }
+
       const res = await fetch("/api/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.wellness) {
@@ -100,7 +112,7 @@ export default function DashboardClient({
     } finally {
       setIsLoadingOTTD(false);
     }
-  }, [aiRecommendation, wellnessMessage]);
+  }, [aiRecommendation, wellnessMessage, fetchLocation]);
 
   // Auto-fetch when OTTD is shown but no recommendation yet
   useEffect(() => {
