@@ -29,7 +29,7 @@ export default async function HistoryPage() {
   // Group by date
   const grouped: Record<string, Dump[]> = {};
   (dumps ?? []).forEach((dump) => {
-    const date = new Date(dump.created_at).toLocaleDateString("ko-KR", {
+    const date = new Date(dump.created_at).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -47,14 +47,14 @@ export default async function HistoryPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-slate-900">기록 히스토리</h1>
+      <h1 className="text-2xl font-bold text-slate-900">History</h1>
 
       {Object.keys(grouped).length === 0 ? (
         <div className="p-8 text-center bg-white rounded-2xl border border-slate-100">
           <div className="text-4xl mb-3">📋</div>
-          <p className="text-slate-500">아직 기록이 없어요</p>
+          <p className="text-slate-500">No history yet</p>
           <p className="text-slate-400 text-sm mt-1">
-            홈에서 할 일, 일정, 메모를 말해보세요
+            Try adding tasks, events, or notes from home
           </p>
         </div>
       ) : (
@@ -81,7 +81,7 @@ export default async function HistoryPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-400 font-mono">
                             {new Date(dump.created_at).toLocaleTimeString(
-                              "ko-KR",
+                              "en-US",
                               {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -103,7 +103,7 @@ export default async function HistoryPage() {
                         {dump.media_url && (
                           <img
                             src={dump.media_url}
-                            alt="첨부 이미지"
+                            alt="Attached image"
                             className="mt-2 max-w-[200px] rounded-lg border border-slate-200"
                           />
                         )}

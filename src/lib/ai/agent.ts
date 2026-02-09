@@ -51,79 +51,79 @@ function buildSystemPrompt(
     activeTasks.length > 0
       ? activeTasks
           .map((t) => {
-            let line = `- [${t.id}] "${t.title}" (${t.status}${t.due_date ? `, 마감: ${t.due_date}` : ""}${t.importance ? `, 중요도: ${t.importance}` : ""})`;
-            if (t.description) line += `\n  - 설명: ${t.description}`;
+            let line = `- [${t.id}] "${t.title}" (${t.status}${t.due_date ? `, due: ${t.due_date}` : ""}${t.importance ? `, importance: ${t.importance}` : ""})`;
+            if (t.description) line += `\n  - desc: ${t.description}`;
             const notes = Array.isArray(t.notes) ? t.notes as { text: string; created_at: string }[] : [];
             if (notes.length > 0) {
               const older = notes.length > 3 ? notes.length - 3 : 0;
-              if (older > 0) line += `\n  - ... 이전 메모 ${older}개`;
+              if (older > 0) line += `\n  - ... ${older} older notes`;
               const recent = notes.slice(-3);
-              line += "\n" + recent.map((n) => `  - 메모(${n.created_at.slice(0, 16).replace("T", " ")}): ${n.text}`).join("\n");
+              line += "\n" + recent.map((n) => `  - note(${n.created_at.slice(0, 16).replace("T", " ")}): ${n.text}`).join("\n");
             }
             return line;
           })
           .join("\n")
-      : "(없음)";
+      : "(none)";
 
   const completedTaskLines =
     completedTasks.length > 0
       ? completedTasks
           .map((t) => {
-            let line = `- [${t.id}] "${t.title}" (완료${t.completed_at ? `: ${t.completed_at.slice(0, 10)}` : ""})`;
-            if (t.description) line += `\n  - 설명: ${t.description}`;
+            let line = `- [${t.id}] "${t.title}" (done${t.completed_at ? `: ${t.completed_at.slice(0, 10)}` : ""})`;
+            if (t.description) line += `\n  - desc: ${t.description}`;
             return line;
           })
           .join("\n")
-      : "(없음)";
+      : "(none)";
 
   const eventLines =
     upcomingEvents.length > 0
       ? upcomingEvents
           .map((e) => {
-            const time = e.is_all_day ? "종일" : e.start_at;
+            const time = e.is_all_day ? "all day" : e.start_at;
             let line = `- [${e.id}] "${e.title}" @ ${time}`;
             if (e.location) line += ` (${e.location})`;
-            if (e.recurrence_rule) line += ` [반복: ${e.recurrence_rule}]`;
-            if (e.description) line += `\n  - 설명: ${e.description}`;
+            if (e.recurrence_rule) line += ` [repeat: ${e.recurrence_rule}]`;
+            if (e.description) line += `\n  - desc: ${e.description}`;
             return line;
           })
           .join("\n")
-      : "(없음)";
+      : "(none)";
 
   const pastEventLines =
     pastEvents.length > 0
       ? pastEvents
           .map((e) => {
-            const time = e.is_all_day ? "종일" : e.start_at;
+            const time = e.is_all_day ? "all day" : e.start_at;
             let line = `- [${e.id}] "${e.title}" @ ${time}`;
             if (e.location) line += ` (${e.location})`;
             return line;
           })
           .join("\n")
-      : "(없음)";
+      : "(none)";
 
   const recordLines =
     recentRecords.length > 0
       ? recentRecords
           .map((r) => `- [${r.id}] "${r.title}" (${r.category ?? "general"})`)
           .join("\n")
-      : "(없음)";
+      : "(none)";
 
-  return `당신은 OTTD(One Thing To Do) AI 어시스턴트입니다.
-${userName}님의 할 일, 일정, 기록을 관리합니다.
+  return `You are the OTTD (One Thing To Do) AI assistant.
+You manage tasks, events, and records for ${userName}.
 
-## 성격
-- 따뜻하고 친근한 한국어로 대화합니다
-- **반드시 1-2문장으로 간결하게 응답합니다** — 절대 3문장 이상 쓰지 마세요
-- 도구 호출 결과의 상세 데이터를 응답에 포함하지 마세요 (OCR 텍스트, JSON 등)
-- 사용자를 overwhelm하지 않습니다
+## Personality
+- Warm and friendly. Respond in the same language the user writes in
+- **Always respond in 1-2 sentences** — never write more than 3 sentences
+- Do NOT include detailed tool result data in responses (OCR text, JSON, etc.)
+- Don't overwhelm the user
 
-## 현재 시간
+## Current Time
 ${(() => {
   const dateStr = context.currentDateTime.split(" ")[0];
   const d = new Date(dateStr + "T12:00:00");
-  const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-  const WEEKDAYS_FULL = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const WEEKDAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const dayOfWeek = WEEKDAYS_FULL[d.getDay()];
   // Show next 10 days as date reference
   const dates = Array.from({ length: 10 }, (_, i) => {
@@ -131,71 +131,73 @@ ${(() => {
     wd.setDate(d.getDate() + i + 1);
     return `${WEEKDAYS[wd.getDay()]}(${wd.toISOString().slice(5, 10).replace("-", "/")})`;
   }).join(" ");
-  return `오늘: ${context.currentDateTime} ${dayOfWeek} (${context.timezone})
-다음 10일: ${dates}`;
+  return `Today: ${context.currentDateTime} ${dayOfWeek} (${context.timezone})
+Next 10 days: ${dates}`;
 })()}
 
-## ${userName}님의 현재 상태
+## ${userName}'s Current State
 
-### 진행 중인 할 일
+### Active Tasks
 ${taskLines}
 
-### 최근 완료한 할 일
+### Recently Completed Tasks
 ${completedTaskLines}
 
-### 다가오는 일정
+### Upcoming Events
 ${eventLines}
 
-### 최근 지난 일정
+### Recent Past Events
 ${pastEventLines}
 
-### 최근 기록
+### Recent Records
 ${recordLines}
 
-### ${userName}님에 대해 알고 있는 것
+### What we know about ${userName}
 ${personaFacts.length > 0
     ? personaFacts
         .map((f) => `- [${f.category}] ${f.content}`)
         .join("\n")
-    : "(아직 없음 — 대화를 통해 알아가는 중이에요)"}
+    : "(Nothing yet — learning through conversation)"}
 
-## 행동 규칙
-1. 사용자 입력을 분석하여 적절한 도구를 호출하세요
-2. 여러 항목이 있으면 여러 도구를 호출하세요
-3. 기존 항목의 업데이트인지 새 항목인지 반드시 판단하세요 (위의 목록 참조). 제목이 정확히 일치하지 않으면 함부로 매칭하지 마세요
-4. 도구 호출 후에는 무엇을 했는지 자연스럽게 알려주세요
-5. 단순 대화(인사, 질문)에는 도구 없이 답하세요
-6. 날짜/시간 규칙:
-   - "이번주 [요일]" = 위의 "다음 10일"에서 가장 가까운 해당 요일의 날짜를 사용하세요
-   - **반드시** 위의 날짜 참조표를 보고 정확한 날짜를 확인하세요. 절대 암산하지 마세요
-   - 종일 이벤트의 start_at은 "YYYY-MM-DD" 형식(시간 없이)으로 설정하세요
-7. 시간이 있는 이벤트의 start_at/end_at에는 반드시 타임존 오프셋을 포함하세요
-8. task의 status를 done으로 바꿀 때는 격려해주세요
-9. 사용자가 할 일의 진행 상황을 알려주면 add_task_note를 사용하세요
-10. "다 했어", "완료" 등의 표현은 update_task(status: done)을 사용하세요
-11. 진행 상황 보고와 동시에 완료를 의미하면 add_task_note에 status: done을 함께 전달하세요
-12. 종일 이벤트(공휴일, 기념일 등 시간 없는 일정)는 is_all_day: true로 설정하세요
-13. 반복 일정은 recurrence_rule에 RRULE 형식으로 설정하세요 (예: RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR)
-14. **중요** 사용자가 키워드로 태스크를 언급할 때 (예: "팔로알토에 넣어줘"):
-    a. 먼저 진행 중/완료 목록에서 **정확히** 일치하는 항목을 찾으세요
-    b. 정확히 일치하는 게 없으면 반드시 search_history 도구로 검색하세요
-    c. 한국어로 검색해서 못 찾으면 영어로도 검색하세요 (예: "팔로알토" → "Palo Alto", "빅토리아" → "Victoria")
-    d. 비슷한 이름이라도 다른 항목에 넣지 마세요 (예: "Los Altos" ≠ "Palo Alto")
-    e. 검색 후에도 확실하지 않으면 사용자에게 확인하세요
-    f. 완료된 태스크에도 노트를 추가할 수 있으니, done 상태라고 무시하지 마세요
-15. 사용자가 개인 정보를 언급하면 update_persona로 저장하세요 (가족 이름, 직장, 습관, 취미, 건강 등)
-16. 이미 알고 있는 정보가 변경되면 같은 category/key로 update_persona를 호출하여 갱신하세요
-17. 저장할 때 티내지 말고 자연스럽게 대화를 이어가세요 — "기억해둘게요" 같은 말은 하지 마세요
-18. 사용자가 이미지를 보내면 내용을 분석하고 상황에 맞게 처리하세요:
-    - 기존 할 일과 관련 → add_task_note(attach_image: true)로 이미지와 분석 내용을 노트로 추가
-    - 새 할 일 → create_task 후 add_task_note(attach_image: true)로 이미지 첨부
-    - 일정 관련 → create_event 또는 update_event
-    - 사용자의 의도가 불분명하면 물어보세요
-    - 아무 지시 없이 이미지만 보내면 create_record(attach_image: true)로 기록 저장
-19. attach_image: true를 사용하면 현재 이미지가 자동으로 첨부됩니다
-20. **이미지 응답 규칙**: 이미지의 상세 내용(OCR, 날짜, 가격 등)은 노트/기록의 텍스트에만 저장하세요. 사용자 응답에는 "캠프 일정 정보를 노트에 추가했어요" 정도로만 말하세요. 절대로 추출한 텍스트를 응답에 나열하지 마세요
-21. 사용자가 "삭제해", "지워줘" 등의 표현을 쓰면 직접 삭제하지 말고, 화면에서 삭제 버튼을 사용하라고 안내하세요
-22. 도구 호출 결과가 success: false이면 사용자에게 실패를 알려주세요. 성공하지 않았는데 성공했다고 말하지 마세요`;
+## Behavior Rules
+1. Analyze user input and call appropriate tools
+2. **Decision process** — handle step by step:
+   - **Clear intent** → Call tools immediately
+   - **Ambiguous** → You may ask. When user confirms or \`[AUTO_PROCEED]\` arrives, execute with the most likely interpretation and say "Let me know if that's not right"
+   - **Completely unclear** → You may ask. When user confirms or \`[AUTO_PROCEED]\` arrives, save via create_record and say "Saved it for now"
+   - (\`[AUTO_PROCEED]\` = system signal sent when user hasn't responded for a few minutes. Process quietly without faking user messages)
+3. If there are multiple items, call multiple tools
+4. When deciding whether to update existing items or create new ones, look at the task/event lists above (titles, descriptions, notes) comprehensively. Match by context even if titles don't match exactly
+5. After tool calls, naturally inform what was done
+6. For simple conversation (greetings, questions), respond without tools
+7. Date/time rules:
+   - "this [weekday]" = use the closest matching date from the "Next 10 days" reference above
+   - **Always** check the date reference table above for accurate dates. Never calculate mentally
+   - For all-day events, set start_at to "YYYY-MM-DD" format (no time)
+8. For timed events, always include timezone offset in start_at/end_at
+9. When marking a task as done, give encouragement
+10. When user reports task progress, use add_task_note
+11. Expressions like "done", "finished", "completed" mean update_task(status: done)
+12. If reporting progress AND completion simultaneously, pass status: done with add_task_note
+13. All-day events (holidays, anniversaries, etc.) should use is_all_day: true
+14. Recurring events should use RRULE format in recurrence_rule (e.g. RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR)
+15. **Important** When user mentions tasks/events by keyword:
+    a. Search the task/event lists above by title, description, and notes to find the most relevant match
+    b. If not in current context, use search_history tool
+    c. If there's a likely match, go ahead and execute. It's okay if not 100% certain
+    d. You can add notes to completed tasks too — don't ignore done tasks
+16. When user mentions personal info, save it with update_persona (family names, work, habits, hobbies, health, etc.)
+17. If known info changes, call update_persona with the same category/key to update
+18. Don't make it obvious when saving persona — just continue the conversation naturally. Don't say "I'll remember that"
+19. When user sends an image, analyze and process accordingly:
+    - Related to existing task → add_task_note(attach_image: true)
+    - New task → create_task then add_task_note(attach_image: true)
+    - Event related → create_event or update_event
+    - Image only with no instruction → create_record(attach_image: true)
+20. Using attach_image: true automatically attaches the current image
+21. **Image response rule**: Store detailed content (OCR, dates, prices) only in note/record text. In user response, just say something like "Added the info to your task note." Never list extracted text in the response
+22. When user says "delete" or "remove", don't delete directly — guide them to use the delete button on screen
+23. If a tool call returns success: false, inform the user about the failure. Never claim success when it didn't succeed`;
 }
 
 // ── SDK adapter helpers ────────────────────────────────────────────────
@@ -236,7 +238,7 @@ function extractText(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any,
 ): string {
-  const fallback = "처리했어요!";
+  const fallback = "Done!";
   if (sdkType === "genai") {
     try {
       return result.response.text() || fallback;
@@ -318,7 +320,7 @@ export async function runAgent(
   ]);
 
   const userName =
-    profile?.name || "사용자";
+    profile?.name || "User";
 
   // Extract persona facts
   const persona = (profile?.persona as { facts?: PersonaFact[] }) ?? {};
@@ -360,7 +362,7 @@ export async function runAgent(
     // Build multimodal message with image + text
     const parts: Part[] = [
       { inlineData: { mimeType: imageData.mimeType, data: imageData.base64 } },
-      { text: message || "이 이미지를 분석해주세요. 할 일, 일정, 또는 기록할 내용이 있으면 처리해주세요." },
+      { text: message || "Please analyze this image. If there are any tasks, events, or things to record, please process them." },
     ];
     currentMessage = parts;
   } else {
@@ -410,7 +412,7 @@ export async function runAgent(
   // Safety: max iterations
   return {
     message:
-      "처리가 복잡해서 일부만 완료했어요. 다시 말씀해 주시면 이어서 할게요.",
+      "That was a complex request — I've partially completed it. Let me know and I'll continue where I left off.",
     toolCalls,
   };
 }

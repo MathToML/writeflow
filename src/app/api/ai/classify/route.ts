@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const userTimezone = timezone || "Asia/Seoul";
 
-  // 1. Brain dump 원본 저장
+  // 1. Save raw brain dump
   const { data: dump, error: dumpError } = await supabase
     .from("dumps")
     .insert({ user_id: user.id, type: "text" as const, raw_content: rawContent })
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // 2. AI 분류 (실패해도 dump 원본은 보존)
+  // 2. AI classification (raw dump preserved even on failure)
   try {
     // Format current datetime in the user's timezone
     const now = new Date();
@@ -51,13 +51,13 @@ export async function POST(request: Request) {
     }).replace(",", "");
     const classifications = await classifyDump(rawContent, currentDateTime, userTimezone);
 
-    // 3. dump에 AI 분석 결과 업데이트
+    // 3. Update dump with AI analysis result
     await supabase
       .from("dumps")
       .update({ ai_analysis: JSON.parse(JSON.stringify(classifications)) as Json })
       .eq("id", dump.id);
 
-    // 4. 분류 결과에 따라 해당 테이블에 저장
+    // 4. Save to corresponding table based on classification
     const createdItems = [];
 
     for (const classification of classifications) {
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
       createdItem: createdItems[0] ?? null,
     });
   } catch (aiError) {
-    // AI 분류 실패 시에도 dump는 보존
+    // Raw dump is preserved even when AI classification fails
     await supabase
       .from("dumps")
       .update({

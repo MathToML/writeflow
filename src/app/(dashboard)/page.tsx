@@ -39,6 +39,7 @@ export default async function DashboardPage() {
       .from("events")
       .select("*")
       .eq("user_id", user.id)
+      .eq("status", "active")
       .gte("start_at", todayStart.toISOString())
       .lte("start_at", todayEnd.toISOString())
       .order("start_at", { ascending: true }),
@@ -46,6 +47,7 @@ export default async function DashboardPage() {
       .from("events")
       .select("*")
       .eq("user_id", user.id)
+      .eq("status", "active")
       .gt("start_at", todayEnd.toISOString())
       .lte("start_at", weekEnd.toISOString())
       .order("start_at", { ascending: true })

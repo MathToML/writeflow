@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   if (userHour >= 0 && userHour < 5) {
     return NextResponse.json({
       recommendation: null,
-      wellness: "이 시간엔 푹 쉬는 게 내일의 생산성이에요. 편히 주무세요 🌙",
+      wellness: "Rest well tonight — it's the best thing for tomorrow's productivity. Good night 🌙",
     });
   }
 
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   if (completed >= 5) {
     return NextResponse.json({
       recommendation: null,
-      wellness: `오늘 벌써 ${completed}개나 해냈어요! 이만하면 충분히 잘한 하루예요. 쉬어도 괜찮아요 ☕`,
+      wellness: `You've already completed ${completed} tasks today! That's a great day. It's okay to take a break ☕`,
     });
   }
 

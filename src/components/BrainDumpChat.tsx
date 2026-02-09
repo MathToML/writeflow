@@ -38,9 +38,9 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 function formatLegacy(items: LegacyClassification[]): string {
   const labels: Record<string, string> = {
-    event: "\u{1F4C5} 일정",
-    task: "\u2705 할 일",
-    record: "\u{1F4DD} 기록",
+    event: "\u{1F4C5} Event",
+    task: "\u2705 Task",
+    record: "\u{1F4DD} Record",
   };
   return items
     .map((i) => `${labels[i.type || ""] || "\u{1F4BE}"}: ${i.title}`)
@@ -107,6 +107,14 @@ export default function BrainDumpChat({
   const [mounted, setMounted] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounterRef = useRef(0);
+  const autoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCheckedAiMsgRef = useRef<string | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const isLoadingRef = useRef(isLoading);
+  isLoadingRef.current = isLoading;
+  const onDumpCreatedRef = useRef(onDumpCreated);
+  onDumpCreatedRef.current = onDumpCreated;
 
   useEffect(() => setMounted(true), []);
 
@@ -130,13 +138,75 @@ export default function BrainDumpChat({
     }
   }, [messages, isChatOpen]);
 
+  // Clear auto-timeout helper
+  const clearAutoTimeout = useCallback(() => {
+    if (autoTimeoutRef.current) {
+      clearTimeout(autoTimeoutRef.current);
+      autoTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Clean up auto-timeout on unmount
+  useEffect(() => clearAutoTimeout, [clearAutoTimeout]);
+
+  // Auto-proceed when AI asks a question and user doesn't respond within 2 min
+  useEffect(() => {
+    const lastMsg = messages[messages.length - 1];
+    if (!lastMsg || lastMsg.role !== "ai" || isLoading) return;
+    if (lastMsg.id === lastCheckedAiMsgRef.current) return;
+    lastCheckedAiMsgRef.current = lastMsg.id;
+
+    clearAutoTimeout();
+
+    // Detect question patterns (English + Korean since AI may respond in either language)
+    const isQuestion = /[?？]|까요|[일할건인]가요|나요/.test(lastMsg.content) || lastMsg.content.includes("?");
+    if (!isQuestion) return;
+
+    autoTimeoutRef.current = setTimeout(async () => {
+      if (isLoadingRef.current) return;
+
+      setIsLoading(true);
+
+      try {
+        const chatHistory = messagesRef.current.map((m) => ({
+          role: m.role === "user" ? "user" : "model",
+          content: m.content,
+        }));
+
+        const res = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: "[AUTO_PROCEED]",
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            history: chatHistory,
+          }),
+        });
+
+        const data = await res.json();
+        const aiMsg: ChatMessage = {
+          id: `ai-${Date.now()}`,
+          role: "ai",
+          content: data.message,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+        onDumpCreatedRef.current?.();
+      } catch {
+        // Silent fail — user will see AI's last question still
+      } finally {
+        setIsLoading(false);
+      }
+    }, 2 * 60 * 1000);
+  }, [messages, isLoading, clearAutoTimeout]);
+
   const handleImageSelect = useCallback((file: File) => {
     if (!VALID_IMAGE_TYPES.includes(file.type)) {
-      alert("지원하지 않는 이미지 형식이에요. (JPEG, PNG, WebP, GIF)");
+      alert("Unsupported image format. (JPEG, PNG, WebP, GIF)");
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      alert("이미지가 너무 커요. (최대 5MB)");
+      alert("Image is too large. (Max 5MB)");
       return;
     }
 
@@ -234,12 +304,14 @@ export default function BrainDumpChat({
     if (!text && !selectedImage) return;
     if (isLoading) return;
 
+    clearAutoTimeout();
+
     onChatOpenChange(true);
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: text || "[이미지]",
+      content: text || "[Image]",
       timestamp: new Date().toISOString(),
       imageUrl: selectedImage?.preview,
     };
@@ -297,7 +369,7 @@ export default function BrainDumpChat({
       const errMsg: ChatMessage = {
         id: `ai-err-${Date.now()}`,
         role: "ai",
-        content: "\u26A0\uFE0F 오류가 발생했어요. 다시 시도해 주세요.",
+        content: "\u26A0\uFE0F Something went wrong. Please try again.",
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errMsg]);
@@ -342,8 +414,8 @@ export default function BrainDumpChat({
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
               </svg>
-              <p className="text-lg font-medium text-blue-700">이미지를 여기에 놓으세요</p>
-              <p className="text-sm text-blue-500/70">JPEG, PNG, WebP, GIF (최대 5MB)</p>
+              <p className="text-lg font-medium text-blue-700">Drop your image here</p>
+              <p className="text-sm text-blue-500/70">JPEG, PNG, WebP, GIF (max 5MB)</p>
             </div>
           </div>,
           document.body,
@@ -360,7 +432,7 @@ export default function BrainDumpChat({
             <div className="px-4 py-4">
               {messages.length === 0 ? (
                 <p className="text-center text-sm text-slate-400 py-6">
-                  대화가 시작되면 여기에 표시돼요
+                  Your conversation will appear here
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -379,11 +451,11 @@ export default function BrainDumpChat({
                         {msg.imageUrl && (
                           <img
                             src={msg.imageUrl}
-                            alt="첨부 이미지"
+                            alt="Attached image"
                             className="max-w-full rounded-lg mb-1"
                           />
                         )}
-                        {msg.content !== "[이미지]" && (
+                        {msg.content !== "[Image]" && (
                           <span className="whitespace-pre-wrap">{msg.content}</span>
                         )}
                       </div>
@@ -415,13 +487,13 @@ export default function BrainDumpChat({
               <div className="relative inline-block">
                 <img
                   src={selectedImage.preview}
-                  alt="첨부 이미지"
+                  alt="Attached image"
                   className="h-20 rounded-lg border border-slate-200 object-cover"
                 />
                 <button
                   onClick={removeImage}
                   className="absolute -top-2 -right-2 w-5 h-5 bg-slate-700 text-white rounded-full text-xs flex items-center justify-center hover:bg-slate-900 transition-colors"
-                  aria-label="이미지 제거"
+                  aria-label="Remove image"
                 >
                   &times;
                 </button>
@@ -435,7 +507,7 @@ export default function BrainDumpChat({
               onClick={() => fileInputRef.current?.click()}
               disabled={isLoading}
               className="p-2 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-40 shrink-0"
-              aria-label="이미지 첨부"
+              aria-label="Attach image"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -459,7 +531,7 @@ export default function BrainDumpChat({
               onFocus={() => { if (!isChatOpen) onChatOpenChange(true); }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="할 일, 일정, 메모 — 그냥 말해보세요"
+              placeholder="Tasks, events, notes — just type anything"
               className="flex-1 px-2 py-2.5 text-sm bg-transparent outline-none text-slate-800 placeholder:text-slate-400"
               disabled={isLoading}
             />
@@ -471,7 +543,7 @@ export default function BrainDumpChat({
               {isLoading ? (
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
               ) : (
-                "보내기"
+                "Send"
               )}
             </button>
           </div>

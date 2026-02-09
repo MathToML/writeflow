@@ -15,9 +15,9 @@ interface DumpResponse {
 }
 
 const TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
-  event: { label: "일정", emoji: "📅" },
-  task: { label: "할 일", emoji: "✅" },
-  record: { label: "기록", emoji: "📝" },
+  event: { label: "Event", emoji: "📅" },
+  task: { label: "Task", emoji: "✅" },
+  record: { label: "Record", emoji: "📝" },
 };
 
 export default function BrainDumpInput({
@@ -67,16 +67,16 @@ export default function BrainDumpInput({
             return `${typeInfo.emoji} ${item.title}`;
           }).join("\n");
           setFeedback({
-            type: `📦 ${items.length}개 항목`,
-            title: "분류 완료",
+            type: `📦 ${items.length} items`,
+            title: "Classified",
             reasoning: summary,
           });
         }
       } else {
         setFeedback({
           type: "💾",
-          title: "저장됨",
-          reasoning: data.error || "내용이 저장되었어요",
+          title: "Saved",
+          reasoning: data.error || "Your entry has been saved",
         });
       }
 
@@ -87,8 +87,8 @@ export default function BrainDumpInput({
     } catch {
       setFeedback({
         type: "⚠️",
-        title: "오류",
-        reasoning: "다시 시도해 주세요",
+        title: "Error",
+        reasoning: "Please try again",
       });
     } finally {
       setIsLoading(false);
@@ -110,7 +110,7 @@ export default function BrainDumpInput({
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="할 일, 일정, 메모 — 그냥 말해보세요"
+          placeholder="Tasks, events, notes — just type anything"
           className="w-full min-h-[100px] p-4 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-800 placeholder:text-slate-400"
           disabled={isLoading}
         />
@@ -124,10 +124,10 @@ export default function BrainDumpInput({
             {isLoading ? (
               <span className="flex items-center gap-1.5">
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                분석 중
+                Analyzing
               </span>
             ) : (
-              "던지기"
+              "Submit"
             )}
           </button>
         </div>

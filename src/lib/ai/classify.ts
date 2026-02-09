@@ -23,44 +23,44 @@ export interface ClassificationResult {
   aiReasoning?: string;
 }
 
-const CLASSIFICATION_PROMPT = `당신은 사용자의 brain dump를 분류하는 AI 어시스턴트입니다.
+const CLASSIFICATION_PROMPT = `You are an AI assistant that classifies user brain dumps.
 
-사용자가 입력한 내용을 분석하여 다음 중 하나로 분류하세요:
-1. "event" - 특정 날짜/시간에 발생하는 일정 (약속, 미팅, 예약 등)
-2. "task" - 해야 할 일 (기한이 있을 수도 없을 수도 있음)
-3. "record" - 기록/메모 (참조 정보, 연락처, 절차, 기억해둘 것 등)
+Analyze the user's input and classify each item as one of:
+1. "event" - Something happening at a specific date/time (appointments, meetings, reservations, etc.)
+2. "task" - Something to do (may or may not have a deadline)
+3. "record" - A note/memo (reference info, contacts, procedures, things to remember, etc.)
 
-중요: 사용자 입력에 여러 항목이 포함될 수 있습니다.
-- 여러 항목이면 JSON 배열로 응답하세요: [{ ... }, { ... }]
-- 단일 항목이면 하나의 JSON 객체로 응답하세요: { ... }
+Important: User input may contain multiple items.
+- If multiple items, respond with a JSON array: [{ ... }, { ... }]
+- If a single item, respond with a single JSON object: { ... }
 
-각 항목의 JSON 형식 (코드블록 없이 순수 JSON만):
+JSON format for each item (pure JSON only, no code blocks):
 {
   "type": "event | task | record",
-  "title": "간결한 제목",
-  "description": "상세 내용 (필요한 경우)",
-  "startAt": "ISO datetime with timezone offset (event인 경우, 예: 2026-02-07T07:00:00+09:00)",
-  "endAt": "ISO datetime with timezone offset (event인 경우, 선택)",
-  "location": "장소 (있는 경우)",
+  "title": "Concise title",
+  "description": "Details (if needed)",
+  "startAt": "ISO datetime with timezone offset (for events, e.g. 2026-02-07T07:00:00+09:00)",
+  "endAt": "ISO datetime with timezone offset (for events, optional)",
+  "location": "Location (if any)",
   "importance": 3,
   "contextType": "location_dependent|desk_work|communication|errand|quick|other",
-  "dueDate": "YYYY-MM-DD (task인 경우, 있으면)",
+  "dueDate": "YYYY-MM-DD (for tasks, if applicable)",
   "category": "contact|procedure|family|shopping|client|general",
-  "tags": ["태그1"],
-  "relatedPeople": ["관련 인물"],
-  "aiReasoning": "분류 근거 한 줄 설명"
+  "tags": ["tag1"],
+  "relatedPeople": ["person name"],
+  "aiReasoning": "One-line explanation for the classification"
 }
 
-중요:
-- importance는 1(낮음)~5(긴급) 스케일
-- contextType은 task인 경우만 설정
-- category는 record인 경우만 설정
-- 날짜/시간이 애매하면 합리적으로 추론 (예: "내일" → 현재 날짜+1)
-- startAt/endAt에는 반드시 사용자 타임존 오프셋을 포함할 것 (예: +09:00)
-- 응답에 JSON만 포함할 것 (다른 텍스트 없이)
+Important:
+- importance is on a 1 (low) to 5 (urgent) scale
+- contextType is only for tasks
+- category is only for records
+- If date/time is ambiguous, infer reasonably (e.g. "tomorrow" → current date + 1)
+- startAt/endAt must include the user's timezone offset (e.g. +09:00)
+- Respond with JSON only (no other text)
 
-현재 날짜/시간: {{currentDateTime}}
-사용자 타임존: {{timezone}}`;
+Current date/time: {{currentDateTime}}
+User timezone: {{timezone}}`;
 
 export async function classifyDump(
   rawContent: string,
@@ -71,7 +71,7 @@ export async function classifyDump(
     .replace("{{currentDateTime}}", currentDateTime)
     .replace("{{timezone}}", timezone);
 
-  const fullPrompt = `${prompt}\n\n사용자 입력: ${rawContent}`;
+  const fullPrompt = `${prompt}\n\nUser input: ${rawContent}`;
   const { type, model } = getModel();
 
   let responseText: string;

@@ -19,11 +19,11 @@ interface OneThingCardProps {
 }
 
 const ENCOURAGEMENTS = [
-  "첫 걸음을 뗐어요! 🎉",
-  "좋은 흐름이에요! 💪",
-  "오늘도 해내고 있어요! ✨",
-  "정말 대단해요! 🌟",
-  "멈추지 않는 당신, 최고예요! 🏆",
+  "First step done! 🎉",
+  "Great momentum! 💪",
+  "You're on a roll! ✨",
+  "Amazing work! 🌟",
+  "Unstoppable! 🏆",
 ];
 
 export default function OneThingCard({
@@ -65,7 +65,7 @@ export default function OneThingCard({
         <div className="text-4xl">🎯</div>
         <p className="text-xl font-bold text-green-800">{msg}</p>
         <p className="text-green-600 text-sm">
-          오늘 {todayCount}개 완료했어요
+          {todayCount} completed today
         </p>
       </div>
     );
@@ -76,7 +76,7 @@ export default function OneThingCard({
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">
-            지금 이것 하나만
+            One Thing To Do
           </p>
           <h2 className="text-xl font-bold text-slate-900">{task.title}</h2>
         </div>
@@ -91,7 +91,7 @@ export default function OneThingCard({
 
       {task.due_date && (
         <p className="text-xs text-slate-500">
-          마감: {new Date(task.due_date).toLocaleDateString("ko-KR")}
+          Due: {new Date(task.due_date).toLocaleDateString("en-US")}
         </p>
       )}
 
@@ -101,13 +101,13 @@ export default function OneThingCard({
           disabled={isCompleting}
           className="flex-1 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 disabled:opacity-60 transition-all active:scale-[0.98]"
         >
-          {isCompleting ? "처리 중..." : "했어요 ✓"}
+          {isCompleting ? "Completing..." : "Done ✓"}
         </button>
         <button
           onClick={handleDefer}
           className="px-4 py-3 text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all text-sm"
         >
-          지금은 아니에요
+          Not now
         </button>
       </div>
     </div>

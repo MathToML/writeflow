@@ -243,7 +243,7 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
         },
         content: {
           type: SchemaType.STRING,
-          description: "The fact to remember, e.g. '아내 이름은 지영'",
+          description: "The fact to remember, e.g. 'Wife's name is Jane'",
         },
       },
       required: ["category", "key", "content"],
@@ -580,13 +580,21 @@ async function addTaskNote(
   }
 
   const currentNotes =
-    (currentTask.notes as { text: string; created_at: string; media_url?: string }[] | null) ?? [];
-  const newNote: { text: string; created_at: string; media_url?: string } = {
+    (currentTask.notes as { text: string; created_at: string; media_url?: string; attachments?: { storage_path: string; signed_url: string; file_name: string; file_type: string; file_size: number }[] }[] | null) ?? [];
+  const newNote: { text: string; created_at: string; media_url?: string; attachments?: { storage_path: string; signed_url: string; file_name: string; file_type: string; file_size: number }[] } = {
     text: noteText,
     created_at: new Date().toISOString(),
   };
   if (attachImage && mediaUrl) {
     newNote.media_url = mediaUrl;
+    // Also populate attachments array for new schema compatibility
+    newNote.attachments = [{
+      storage_path: "",
+      signed_url: mediaUrl,
+      file_name: "image",
+      file_type: "image/jpeg",
+      file_size: 0,
+    }];
   }
   const updatedNotes = [...currentNotes, newNote];
 

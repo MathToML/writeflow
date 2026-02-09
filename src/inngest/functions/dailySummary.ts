@@ -55,7 +55,7 @@ export const generateDailySummary = inngest.createFunction(
           {
             user_id: userId,
             date: yesterdayStr,
-            summary_text: `${dumpCount ?? 0}개의 기록, ${completedCount ?? 0}개의 할 일 완료`,
+            summary_text: `${dumpCount ?? 0} entries, ${completedCount ?? 0} tasks completed`,
             stats: {
               dumps: dumpCount ?? 0,
               completed: completedCount ?? 0,

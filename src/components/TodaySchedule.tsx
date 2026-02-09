@@ -21,7 +21,7 @@ export default function TodaySchedule({
     return (
       <div className="p-4 bg-slate-50 rounded-xl">
         <p className="text-sm text-slate-400 text-center">
-          오늘은 일정이 없어요
+          No events today
         </p>
       </div>
     );
@@ -35,7 +35,7 @@ export default function TodaySchedule({
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-medium text-slate-500 px-1">오늘의 일정</h3>
+      <h3 className="text-sm font-medium text-slate-500 px-1">Today&apos;s Schedule</h3>
       <div className="space-y-1.5">
         {/* All-day events */}
         {allDayEvents.map((event) => {
@@ -53,7 +53,7 @@ export default function TodaySchedule({
               }`}
             >
               <span className="text-xs font-medium text-blue-500 w-14 shrink-0">
-                종일
+                All day
               </span>
               <span className={`text-sm ${isCancelled ? "text-slate-400" : "text-slate-800"}`}>
                 {event.title}

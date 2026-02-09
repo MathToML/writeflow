@@ -6,10 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/", label: "홈", icon: "🎯" },
-  { href: "/calendar", label: "일정", icon: "📅" },
-  { href: "/tasks", label: "할 일", icon: "✅" },
-  { href: "/history", label: "기록", icon: "📋" },
+  { href: "/", label: "Home", icon: "🎯" },
+  { href: "/calendar", label: "Calendar", icon: "📅" },
+  { href: "/tasks", label: "Tasks", icon: "✅" },
+  { href: "/history", label: "History", icon: "📋" },
 ];
 
 export default function Navigation({ userName }: { userName?: string }) {
@@ -54,7 +54,7 @@ export default function Navigation({ userName }: { userName?: string }) {
             onClick={handleLogout}
             className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
           >
-            로그아웃
+            Logout
           </button>
         </div>
       </div>

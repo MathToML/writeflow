@@ -135,7 +135,7 @@ export default function DashboardClient({
         {/* 1. Date / Time Header */}
         <div className="text-center space-y-1 pt-2">
           <p className="text-2xl font-bold text-slate-900">
-            {now.toLocaleDateString("ko-KR", {
+            {now.toLocaleDateString("en-US", {
               month: "long",
               day: "numeric",
               weekday: "long",
@@ -150,7 +150,7 @@ export default function DashboardClient({
           </p>
           {todayCompleted > 0 && (
             <p className="text-sm text-green-600 font-medium">
-              오늘 {todayCompleted}개 완료
+              {todayCompleted} completed today
             </p>
           )}
         </div>
@@ -165,7 +165,7 @@ export default function DashboardClient({
                 : "bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:brightness-110"
             }`}
           >
-            {showOTTD ? "✕ 닫기" : "지금 뭐 할까? 🤔"}
+            {showOTTD ? "✕ Close" : "What should I do now? 🤔"}
           </button>
 
           {showOTTD && wellnessMessage ? (
@@ -185,7 +185,7 @@ export default function DashboardClient({
             <div className="mt-3 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl text-center space-y-3 animate-in">
               <div className="text-3xl animate-bounce">🤔</div>
               <p className="text-slate-600 font-medium">
-                어떤 걸 하면 좋을지 생각하고 있어요...
+                Thinking about what you should do next...
               </p>
               <div className="flex justify-center gap-1">
                 <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
@@ -196,9 +196,9 @@ export default function DashboardClient({
           ) : showOTTD && !hasCandidates ? (
             <div className="mt-3 p-6 bg-gradient-to-br from-slate-50 to-blue-50 border border-slate-200 rounded-2xl text-center space-y-2 animate-in">
               <div className="text-3xl">🌿</div>
-              <p className="text-slate-600 font-medium">아직 추천이 없어요</p>
+              <p className="text-slate-600 font-medium">No recommendations yet</p>
               <p className="text-slate-400 text-sm">
-                할 일을 추가하면 AI가 추천해드릴게요
+                Add some tasks and AI will recommend what to do
               </p>
             </div>
           ) : null}
@@ -211,13 +211,13 @@ export default function DashboardClient({
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-sm font-medium text-slate-400">
-              다가오는 일정
+              Upcoming Events
             </h3>
             <button
               onClick={handleCreateEvent}
               className="text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors"
             >
-              + 새 일정
+              + New Event
             </button>
           </div>
           {upcomingEvents.length > 0 ? (
@@ -235,13 +235,13 @@ export default function DashboardClient({
                     className="flex items-center gap-3 p-2.5 rounded-lg text-slate-500 hover:bg-slate-50 cursor-pointer transition-colors group"
                   >
                     <span className="text-xs font-mono text-slate-400 w-32 shrink-0">
-                      {startDate.toLocaleDateString("ko-KR", {
+                      {startDate.toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                       })}{" "}
                       {event.is_all_day
-                        ? "종일"
-                        : startDate.toLocaleTimeString("ko-KR", {
+                        ? "All day"
+                        : startDate.toLocaleTimeString("en-US", {
                             hour: "numeric",
                             minute: "2-digit",
                             hour12: true,
@@ -255,14 +255,14 @@ export default function DashboardClient({
                       }}
                       className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all text-xs"
                     >
-                      삭제
+                      Delete
                     </button>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <p className="text-xs text-slate-300 px-1">예정된 일정이 없어요</p>
+            <p className="text-xs text-slate-300 px-1">No upcoming events</p>
           )}
         </div>
 
@@ -278,10 +278,10 @@ export default function DashboardClient({
           <div className="p-8 text-center bg-white rounded-2xl border border-slate-100">
             <div className="text-4xl mb-3">🌿</div>
             <p className="text-slate-600 font-medium">
-              지금은 할 일이 없어요
+              Nothing to do right now
             </p>
             <p className="text-slate-400 text-sm mt-1">
-              할 일, 일정, 메모 — 그냥 말하면 알아서 정리해드릴게요
+              Tasks, events, notes — just tell me and I&apos;ll organize it
             </p>
           </div>
         )}

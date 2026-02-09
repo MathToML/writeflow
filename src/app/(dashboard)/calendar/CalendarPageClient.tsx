@@ -32,7 +32,7 @@ type ViewMode = "month" | "week" | "list";
 
 // ============ Helpers ============
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function isSameDay(d1: Date, d2: Date) {
   return (
@@ -90,7 +90,7 @@ function groupByDate(events: Event[]): Record<string, Event[]> {
   const grouped: Record<string, Event[]> = {};
   events.forEach((event) => {
     const d = parseEventDate(event);
-    const date = d.toLocaleDateString("ko-KR", {
+    const date = d.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
@@ -249,7 +249,7 @@ function MonthView({
                       ))}
                     {dayEvents.length + dayTasks.length > 2 && (
                       <div className="text-[11px] text-slate-400 px-1.5 font-medium">
-                        +{dayEvents.length + dayTasks.length - 2}개 더
+                        +{dayEvents.length + dayTasks.length - 2} more
                       </div>
                     )}
                   </div>
@@ -376,7 +376,7 @@ function WeekView({
         return (
           <div className="grid grid-cols-[52px_repeat(7,1fr)] border-b border-slate-100 bg-slate-50/50">
             <div className="py-2 px-1 text-[11px] text-slate-400 text-right font-medium">
-              종일
+              All day
             </div>
             {weekDays.map((_, dayIdx) => {
               const bucket = eventsByDay.get(dayIdx);
@@ -500,15 +500,15 @@ function ListView({
     <div className="space-y-8">
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-          다가오는 일정 ({upcomingEvents.length})
+          Upcoming Events ({upcomingEvents.length})
         </h2>
 
         {upcomingEvents.length === 0 ? (
           <div className="p-10 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
             <div className="text-4xl mb-3">📅</div>
-            <p className="text-slate-500 font-medium">예정된 일정이 없어요</p>
+            <p className="text-slate-500 font-medium">No upcoming events</p>
             <p className="text-slate-400 text-sm mt-1">
-              홈에서 일정을 던져보세요 (예: &ldquo;내일 오후 3시 치과&rdquo;)
+              Try adding events from home (e.g. &ldquo;Dentist tomorrow at 3pm&rdquo;)
             </p>
           </div>
         ) : (
@@ -538,9 +538,13 @@ function ListView({
                         {event.title}
                       </p>
                       <p className="text-sm text-slate-500">
-                        {formatTime12h(new Date(event.start_at))}
-                        {event.end_at &&
-                          ` - ${formatTime12h(new Date(event.end_at))}`}
+                        {event.is_all_day
+                          ? "All day"
+                          : <>
+                              {formatTime12h(new Date(event.start_at))}
+                              {event.end_at &&
+                                ` - ${formatTime12h(new Date(event.end_at))}`}
+                            </>}
                       </p>
                       {event.location && (
                         <p className="text-xs text-slate-400">
@@ -556,7 +560,7 @@ function ListView({
                     <div className="flex items-center gap-2 shrink-0">
                       {event.status === "cancelled" ? (
                         <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
-                          취소됨
+                          Cancelled
                         </span>
                       ) : (
                         <>
@@ -564,13 +568,13 @@ function ListView({
                             onClick={() => onEdit(event)}
                             className="text-xs px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           >
-                            수정
+                            Edit
                           </button>
                           <button
                             onClick={() => onDelete(event)}
                             className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                           >
-                            삭제
+                            Delete
                           </button>
                         </>
                       )}
@@ -586,7 +590,7 @@ function ListView({
       {pastEvents.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-            지난 일정
+            Past Events
           </h2>
           {Object.entries(pastGrouped).map(([date, events]) => (
             <div key={date} className="space-y-1.5">
@@ -597,7 +601,7 @@ function ListView({
                   className="flex items-center gap-3 p-3 bg-white/60 rounded-xl text-slate-400 border border-slate-100"
                 >
                   <span className="text-xs font-mono w-16 text-slate-400">
-                    {formatTime12h(new Date(event.start_at))}
+                    {event.is_all_day ? "All day" : formatTime12h(new Date(event.start_at))}
                   </span>
                   <span className="text-sm">{event.title}</span>
                   <span className="text-xs text-green-400 ml-auto">✓</span>
@@ -733,13 +737,15 @@ export default function CalendarPageClient({
 
   const headerLabel = useMemo(() => {
     if (viewMode === "month") {
-      return `${year}년 ${month + 1}월`;
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      return `${monthNames[month]} ${year}`;
     }
     const ws = getWeekStart(currentDate);
     const we = new Date(ws);
     we.setDate(we.getDate() + 6);
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     if (ws.getMonth() === we.getMonth()) {
-      return `${ws.getFullYear()}년 ${ws.getMonth() + 1}월 ${ws.getDate()}일 - ${we.getDate()}일`;
+      return `${monthNames[ws.getMonth()]} ${ws.getDate()} - ${we.getDate()}, ${ws.getFullYear()}`;
     }
     return `${ws.getMonth() + 1}/${ws.getDate()} - ${we.getMonth() + 1}/${we.getDate()}`;
   }, [viewMode, currentDate, year, month]);
@@ -751,12 +757,12 @@ export default function CalendarPageClient({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">일정</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
             <button
               onClick={handleCreateEvent}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
             >
-              + 새 일정
+              + New Event
             </button>
           </div>
           <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-slate-100">
@@ -770,7 +776,7 @@ export default function CalendarPageClient({
                     : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                {mode === "month" ? "월간" : mode === "week" ? "주간" : "목록"}
+                {mode === "month" ? "Month" : mode === "week" ? "Week" : "List"}
               </button>
             ))}
           </div>
@@ -787,7 +793,7 @@ export default function CalendarPageClient({
                 onClick={goToToday}
                 className="px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-sm transition-colors"
               >
-                오늘
+                Today
               </button>
               <button
                 onClick={goToPrevious}
@@ -809,10 +815,10 @@ export default function CalendarPageClient({
         {viewMode !== "list" && (
           <div className="flex items-center gap-5 text-xs text-slate-400">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-400" /> 일정
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-400" /> Events
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-violet-400" /> 할일
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-400" /> Tasks
             </span>
           </div>
         )}
@@ -828,7 +834,7 @@ export default function CalendarPageClient({
                 <p className="text-sm text-slate-500">
                   🕐{" "}
                   {selectedEvent.is_all_day
-                    ? "종일"
+                    ? "All day"
                     : <>
                         {formatTime12h(new Date(selectedEvent.start_at))}
                         {selectedEvent.end_at &&
@@ -856,14 +862,14 @@ export default function CalendarPageClient({
                     onClick={() => handleEditEvent(selectedEvent)}
                     className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                   >
-                    수정
+                    Edit
                   </button>
                   <button
                     onClick={() => handleDeleteEvent(selectedEvent)}
                     disabled={isDeleting}
                     className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-40 transition-colors"
                   >
-                    {isDeleting ? "삭제 중..." : "삭제"}
+                    {isDeleting ? "Deleting..." : "Delete"}
                   </button>
                 </div>
               </div>

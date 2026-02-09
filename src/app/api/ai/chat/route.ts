@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   }
 
   const userTimezone = timezone || "Asia/Seoul";
-  const textContent = message?.trim() || (hasImage ? "[이미지]" : "");
+  const textContent = message?.trim() || (hasImage ? "[Image]" : "");
 
   // 1. Save raw dump
   const { data: dump, error: dumpError } = await supabase
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
       .eq("id", dump.id);
 
     return NextResponse.json({
-      message: "죄송해요, 처리 중 문제가 생겼어요. 다시 시도해 주세요.",
+      message: "Sorry, something went wrong. Please try again.",
       dumpId: dump.id,
       mediaUrl,
     });

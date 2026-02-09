@@ -33,6 +33,6 @@ export function getModel(): ModelWrapper {
   }
 
   throw new Error(
-    "AI 설정 없음: GCP_PROJECT_ID 또는 GEMINI_API_KEY를 .env.local에 설정하세요"
+    "AI not configured: Set GCP_PROJECT_ID or GEMINI_API_KEY in .env.local"
   );
 }

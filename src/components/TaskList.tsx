@@ -16,7 +16,7 @@ export default function TaskList({
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-medium text-slate-400 px-1">
-        할 일 {tasks.length}개
+        Tasks ({tasks.length})
       </h3>
       <div className="space-y-2">
         {tasks.map((task) => (

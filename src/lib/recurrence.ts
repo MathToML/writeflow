@@ -237,42 +237,42 @@ export function expandRecurrences(
   return occurrences;
 }
 
-// Format RRULE to human-readable Korean text
+// Format RRULE to human-readable English text
 export function rruleToKorean(rule: string): string {
   const rrule = parseRRule(rule);
   if (!rrule) return "";
 
   const dayNames: Record<number, string> = {
-    0: "\uC77C",
-    1: "\uC6D4",
-    2: "\uD654",
-    3: "\uC218",
-    4: "\uBAA9",
-    5: "\uAE08",
-    6: "\uD1A0",
+    0: "Sun",
+    1: "Mon",
+    2: "Tue",
+    3: "Wed",
+    4: "Thu",
+    5: "Fri",
+    6: "Sat",
   };
 
   let text = "";
 
   if (rrule.freq === "DAILY") {
-    text = rrule.interval === 1 ? "\uB9E4\uC77C" : `${rrule.interval}\uC77C\uB9C8\uB2E4`;
+    text = rrule.interval === 1 ? "Every day" : `Every ${rrule.interval} days`;
   } else if (rrule.freq === "WEEKLY") {
-    const prefix = rrule.interval === 1 ? "\uB9E4\uC8FC" : `${rrule.interval}\uC8FC\uB9C8\uB2E4`;
+    const prefix = rrule.interval === 1 ? "Every week" : `Every ${rrule.interval} weeks`;
     if (rrule.byDay && rrule.byDay.length > 0) {
-      const days = rrule.byDay.map((d) => dayNames[d]).join(",");
-      text = `${prefix} ${days}`;
+      const days = rrule.byDay.map((d) => dayNames[d]).join(", ");
+      text = `${prefix} on ${days}`;
     } else {
       text = prefix;
     }
   } else if (rrule.freq === "MONTHLY") {
-    const prefix = rrule.interval === 1 ? "\uB9E4\uC6D4" : `${rrule.interval}\uAC1C\uC6D4\uB9C8\uB2E4`;
+    const prefix = rrule.interval === 1 ? "Every month" : `Every ${rrule.interval} months`;
     if (rrule.byMonthDay && rrule.byMonthDay.length > 0) {
-      text = `${prefix} ${rrule.byMonthDay.join(",")}일`;
+      text = `${prefix} on the ${rrule.byMonthDay.join(", ")}`;
     } else {
       text = prefix;
     }
   } else if (rrule.freq === "YEARLY") {
-    text = rrule.interval === 1 ? "\uB9E4\uB144" : `${rrule.interval}\uB144\uB9C8\uB2E4`;
+    text = rrule.interval === 1 ? "Every year" : `Every ${rrule.interval} years`;
   }
 
   return text;

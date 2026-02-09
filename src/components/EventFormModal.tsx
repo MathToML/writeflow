@@ -15,23 +15,23 @@ export interface EventData {
 }
 
 const RECURRENCE_PRESETS = [
-  { label: "반복 없음", value: "" },
-  { label: "매일", value: "RRULE:FREQ=DAILY" },
-  { label: "매주", value: "__WEEKLY__" },
-  { label: "격주", value: "RRULE:FREQ=WEEKLY;INTERVAL=2" },
-  { label: "4주마다", value: "RRULE:FREQ=WEEKLY;INTERVAL=4" },
-  { label: "매월", value: "RRULE:FREQ=MONTHLY" },
-  { label: "매년", value: "RRULE:FREQ=YEARLY" },
+  { label: "No repeat", value: "" },
+  { label: "Daily", value: "RRULE:FREQ=DAILY" },
+  { label: "Weekly", value: "__WEEKLY__" },
+  { label: "Biweekly", value: "RRULE:FREQ=WEEKLY;INTERVAL=2" },
+  { label: "Every 4 weeks", value: "RRULE:FREQ=WEEKLY;INTERVAL=4" },
+  { label: "Monthly", value: "RRULE:FREQ=MONTHLY" },
+  { label: "Yearly", value: "RRULE:FREQ=YEARLY" },
 ];
 
 const WEEKDAY_OPTIONS = [
-  { label: "일", value: "SU" },
-  { label: "월", value: "MO" },
-  { label: "화", value: "TU" },
-  { label: "수", value: "WE" },
-  { label: "목", value: "TH" },
-  { label: "금", value: "FR" },
-  { label: "토", value: "SA" },
+  { label: "Sun", value: "SU" },
+  { label: "Mon", value: "MO" },
+  { label: "Tue", value: "TU" },
+  { label: "Wed", value: "WE" },
+  { label: "Thu", value: "TH" },
+  { label: "Fri", value: "FR" },
+  { label: "Sat", value: "SA" },
 ];
 
 function parseDate(iso: string) {
@@ -180,7 +180,7 @@ export default function EventFormModal({
         <div className="p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">
-              {isEditing ? "일정 수정" : "새 일정"}
+              {isEditing ? "Edit Event" : "New Event"}
             </h2>
             <button
               onClick={onClose}
@@ -194,7 +194,7 @@ export default function EventFormModal({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="일정 제목"
+            placeholder="Event title"
             className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
             autoFocus
           />
@@ -206,11 +206,11 @@ export default function EventFormModal({
               onChange={(e) => setIsAllDay(e.target.checked)}
               className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-slate-700">종일</span>
+            <span className="text-sm text-slate-700">All day</span>
           </label>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-500">날짜</label>
+            <label className="text-xs font-medium text-slate-500">Date</label>
             <input
               type="date"
               value={date}
@@ -222,7 +222,7 @@ export default function EventFormModal({
           {!isAllDay && (
             <div className="flex gap-3">
               <div className="flex-1 space-y-2">
-                <label className="text-xs font-medium text-slate-500">시작</label>
+                <label className="text-xs font-medium text-slate-500">Start</label>
                 <input
                   type="time"
                   value={startTime}
@@ -231,7 +231,7 @@ export default function EventFormModal({
                 />
               </div>
               <div className="flex-1 space-y-2">
-                <label className="text-xs font-medium text-slate-500">종료</label>
+                <label className="text-xs font-medium text-slate-500">End</label>
                 <input
                   type="time"
                   value={endTime}
@@ -243,29 +243,29 @@ export default function EventFormModal({
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-500">장소</label>
+            <label className="text-xs font-medium text-slate-500">Location</label>
             <input
               type="text"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="장소 (선택)"
+              placeholder="Location (optional)"
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-blue-400 transition-all"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-500">설명</label>
+            <label className="text-xs font-medium text-slate-500">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="메모 (선택)"
+              placeholder="Notes (optional)"
               rows={2}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-blue-400 transition-all resize-none"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-500">반복</label>
+            <label className="text-xs font-medium text-slate-500">Repeat</label>
             <select
               value={recurrencePreset}
               onChange={(e) => setRecurrencePreset(e.target.value)}
@@ -302,14 +302,14 @@ export default function EventFormModal({
               onClick={onClose}
               className="flex-1 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
             >
-              취소
+              Cancel
             </button>
             <button
               onClick={handleSubmit}
               disabled={!title.trim() || isSaving}
               className="flex-1 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {isSaving ? "저장 중..." : isEditing ? "수정" : "추가"}
+              {isSaving ? "Saving..." : isEditing ? "Save" : "Add"}
             </button>
           </div>
         </div>

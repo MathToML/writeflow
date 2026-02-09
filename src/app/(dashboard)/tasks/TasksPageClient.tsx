@@ -15,16 +15,16 @@ export default function TasksPageClient({
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-slate-900">할 일 목록</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Tasks</h1>
 
       {/* Pending */}
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-slate-500">
-          진행할 일 ({pendingTasks.length})
+          Active ({pendingTasks.length})
         </h2>
         {pendingTasks.length === 0 ? (
           <p className="text-sm text-slate-400 p-4 text-center bg-slate-50 rounded-xl">
-            모든 일을 끝냈어요! 🎉
+            All done! 🎉
           </p>
         ) : (
           <div className="space-y-2">
@@ -39,7 +39,7 @@ export default function TasksPageClient({
       {completedTasks.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-medium text-slate-500">
-            완료 ({completedTasks.length})
+            Completed ({completedTasks.length})
           </h2>
           <div className="space-y-2">
             {completedTasks.map((task) => (

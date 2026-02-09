@@ -23,7 +23,7 @@ export default function LoginPage() {
             One Thing To Do
           </h1>
           <p className="text-slate-500 text-lg">
-            지금 딱 하나만, 부담 없이
+            Focus on one thing at a time
           </p>
         </div>
 
@@ -50,12 +50,12 @@ export default function LoginPage() {
                 fill="#EA4335"
               />
             </svg>
-            Google로 시작하기
+            Continue with Google
           </button>
         </div>
 
         <p className="text-xs text-slate-400 pt-4">
-          모든 것을 기록하고, 하나만 추천해 드릴게요
+          Capture everything, we&apos;ll recommend the one thing to do
         </p>
       </div>
     </div>
