@@ -521,7 +521,7 @@ async function createEvent(
 ): Promise<ToolResult> {
   // Normalize all-day events to noon UTC to prevent timezone day-shift
   let startAt = args.start_at as string;
-  let endAt = (args.end_at as string) ?? null;
+  let endAt: string | null = (args.end_at as string) ?? null;
   if (args.is_all_day) {
     const dateOnly = startAt.slice(0, 10); // "YYYY-MM-DD"
     startAt = `${dateOnly}T12:00:00Z`;
