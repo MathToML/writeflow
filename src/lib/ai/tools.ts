@@ -297,6 +297,31 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "schedule_message",
+    description:
+      "Schedule a message to be sent to the user after a delay. Use for reminders, timers, follow-ups.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        message: {
+          type: SchemaType.STRING,
+          description: "The message to deliver later",
+        },
+        delay_seconds: {
+          type: SchemaType.INTEGER,
+          description:
+            "Delay in seconds before delivering the message (e.g. 20 for 20 seconds, 300 for 5 minutes)",
+        },
+        deliver_at: {
+          type: SchemaType.STRING,
+          description:
+            "ISO datetime string for absolute delivery time. Use either this OR delay_seconds.",
+        },
+      },
+      required: ["message"],
+    },
+  },
+  {
     name: "search_records",
     description: "Search existing records by keyword or category",
     parameters: {
@@ -419,6 +444,8 @@ export async function executeTool(
       return createHabit(args, supabase, userId);
     case "log_habit":
       return logHabit(args, supabase, userId);
+    case "schedule_message":
+      return scheduleMessage(args, supabase, userId);
     case "search_records":
       return searchRecords(args, supabase, userId);
     case "add_task_note":
@@ -700,6 +727,56 @@ async function createExpense(
       currency,
       expense_category: expenseCategory,
     },
+  };
+}
+
+async function scheduleMessage(
+  args: Record<string, unknown>,
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<ToolResult> {
+  const message = args.message as string;
+  const delaySeconds = args.delay_seconds as number | undefined;
+  const deliverAtStr = args.deliver_at as string | undefined;
+
+  // Calculate deliver_at
+  let deliverAt: Date;
+  if (delaySeconds) {
+    deliverAt = new Date(Date.now() + delaySeconds * 1000);
+  } else if (deliverAtStr) {
+    deliverAt = new Date(deliverAtStr);
+  } else {
+    return { success: false, error: "Either delay_seconds or deliver_at is required" };
+  }
+
+  // Save to DB
+  const { data, error } = await supabase
+    .from("scheduled_messages")
+    .insert({
+      user_id: userId,
+      message,
+      deliver_at: deliverAt.toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (error) return { success: false, error: error.message };
+
+  // Send Inngest event
+  const { inngest } = await import("@/inngest/client");
+  await inngest.send({
+    name: "ai/schedule-message",
+    data: {
+      scheduledMessageId: data.id,
+      userId,
+      message,
+      deliverAt: deliverAt.toISOString(),
+    },
+  });
+
+  return {
+    success: true,
+    data: { id: data.id, deliver_at: deliverAt.toISOString() },
   };
 }
 

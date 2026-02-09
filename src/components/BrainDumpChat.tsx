@@ -154,8 +154,11 @@ export default function BrainDumpChat({
           },
           (payload) => {
             const newDump = payload.new as Dump;
-            // Only handle auto-proceed dumps (not regular user messages)
-            if (newDump.raw_content !== "[AUTO_PROCEED]") return;
+            // Only handle system-generated dumps (not regular user messages)
+            const isSystemMessage =
+              newDump.raw_content === "[AUTO_PROCEED]" ||
+              newDump.raw_content === "[SCHEDULED_MESSAGE]";
+            if (!isSystemMessage) return;
 
             const analysis = newDump.ai_analysis as { response?: string } | null;
             const responseText = analysis?.response;

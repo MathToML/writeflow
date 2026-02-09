@@ -246,7 +246,13 @@ ${personaFacts.length > 0
 26. **Proactive habit suggestions:**
     - If you notice a repeated activity in recent records/tasks/conversation (e.g. running 3+ times, daily coffee, regular meditation), proactively suggest: "최근 기록을 보니 [활동]을 꾸준히 하고 계시네요. 습관 대시보드를 만들어드릴까요?"
     - Never be pushy — just a gentle one-time suggestion. If user declines, don't suggest again
-27. When you ask a question that REQUIRES user input before you can proceed (e.g. clarification, confirmation, choice between options), prefix your response with [NEEDS_INPUT]. Do NOT use this for rhetorical questions or when you've already completed the action.`;
+27. When you ask a question that REQUIRES user input before you can proceed (e.g. clarification, confirmation, choice between options), prefix your response with [NEEDS_INPUT]. Do NOT use this for rhetorical questions or when you've already completed the action.
+28. **Reminders & delayed messages:**
+    - When user asks to be reminded, notified, or messaged after some time → use schedule_message
+    - "remind me in 5 minutes" → schedule_message(message: "Here's your reminder!", delay_seconds: 300)
+    - "message me at 3pm" → schedule_message(message: "...", deliver_at: "2026-02-09T15:00:00-05:00")
+    - Write the message in a warm, helpful tone as if you're reaching out later
+    - You CAN set timers and schedule messages — use this tool for any time-based requests`;
 }
 
 // ── SDK adapter helpers ────────────────────────────────────────────────

@@ -329,6 +329,44 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_messages: {
+        Row: {
+          id: string
+          user_id: string
+          message: string
+          deliver_at: string
+          status: string
+          delivered_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          message: string
+          deliver_at: string
+          status?: string
+          delivered_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          message?: string
+          deliver_at?: string
+          status?: string
+          delivered_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       records: {
         Row: {
           category: string | null
