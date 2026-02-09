@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export interface EventData {
   id: string;
@@ -59,6 +59,118 @@ function minutesToTime(mins: number) {
   const m = clamped % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
+// ── Inline date picker ───────────────────────────────────────────────
+
+const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function DatePicker({
+  value,
+  onChange,
+}: {
+  value: string; // "YYYY-MM-DD"
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const [year, month] = value
+    ? [parseInt(value.slice(0, 4)), parseInt(value.slice(5, 7)) - 1]
+    : [new Date().getFullYear(), new Date().getMonth()];
+  const [viewYear, setViewYear] = useState(year);
+  const [viewMonth, setViewMonth] = useState(month);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const prev = () => {
+    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
+    else setViewMonth(viewMonth - 1);
+  };
+  const next = () => {
+    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
+    else setViewMonth(viewMonth + 1);
+  };
+
+  const select = (day: number) => {
+    const m = String(viewMonth + 1).padStart(2, "0");
+    const d = String(day).padStart(2, "0");
+    onChange(`${viewYear}-${m}-${d}`);
+    setOpen(false);
+  };
+
+  const displayDate = value
+    ? new Date(value + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "short", month: "short", day: "numeric", year: "numeric",
+      })
+    : "Select date";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-3 py-2 text-sm text-left border border-slate-200 rounded-xl outline-none hover:border-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all bg-white"
+      >
+        {displayDate}
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-10 bg-white border border-slate-200 rounded-xl shadow-lg p-3 w-64">
+          <div className="flex items-center justify-between mb-2">
+            <button type="button" onClick={prev} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">&lsaquo;</button>
+            <span className="text-sm font-medium text-slate-700">{MONTHS[viewMonth]} {viewYear}</span>
+            <button type="button" onClick={next} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">&rsaquo;</button>
+          </div>
+          <div className="grid grid-cols-7 gap-0.5 text-center">
+            {DAYS.map((d) => (
+              <div key={d} className="text-[10px] font-medium text-slate-400 py-1">{d}</div>
+            ))}
+            {Array.from({ length: firstDay }).map((_, i) => (
+              <div key={`e-${i}`} />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const isSelected = dateStr === value;
+              const isToday = dateStr === today;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => select(day)}
+                  className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${
+                    isSelected
+                      ? "bg-blue-600 text-white"
+                      : isToday
+                        ? "bg-blue-50 text-blue-700 font-semibold"
+                        : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Event form modal ─────────────────────────────────────────────────
 
 export default function EventFormModal({
   event,
@@ -211,12 +323,7 @@ export default function EventFormModal({
 
           <div className="space-y-2">
             <label className="text-xs font-medium text-slate-500">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-blue-400 transition-all"
-            />
+            <DatePicker value={date} onChange={setDate} />
           </div>
 
           {!isAllDay && (
@@ -280,15 +387,17 @@ export default function EventFormModal({
           </div>
 
           {recurrencePreset === "__WEEKLY__" && (
-            <div className="flex gap-1.5">
-              {WEEKDAY_OPTIONS.map((opt) => (
+            <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+              {WEEKDAY_OPTIONS.map((opt, i) => (
                 <button
                   key={opt.value}
                   onClick={() => toggleWeekday(opt.value)}
-                  className={`w-9 h-9 rounded-full text-xs font-medium transition-all ${
+                  className={`flex-1 py-2 text-xs font-medium transition-all ${
+                    i > 0 ? "border-l border-slate-200" : ""
+                  } ${
                     weekdays.includes(opt.value)
-                      ? "bg-blue-500 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
                   {opt.label}
