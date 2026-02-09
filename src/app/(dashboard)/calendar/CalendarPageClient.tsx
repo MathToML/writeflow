@@ -139,8 +139,9 @@ function MonthView({
     tasks.forEach((t) => {
       if (!t.due_date) return;
       const d = new Date(t.due_date);
-      if (d.getFullYear() === year && d.getMonth() === month) {
-        const day = d.getDate();
+      // Use UTC to avoid timezone shift (due_date "YYYY-MM-DD" is parsed as UTC midnight)
+      if (d.getUTCFullYear() === year && d.getUTCMonth() === month) {
+        const day = d.getUTCDate();
         if (!map.has(day)) map.set(day, []);
         map.get(day)!.push(t);
       }
@@ -315,8 +316,10 @@ function WeekView({
     tasks.forEach((t) => {
       if (!t.due_date) return;
       const td = new Date(t.due_date);
+      // Build a local Date from UTC values to avoid timezone shift
+      const tdLocal = new Date(td.getUTCFullYear(), td.getUTCMonth(), td.getUTCDate());
       weekDays.forEach((wd, idx) => {
-        if (isSameDay(td, wd)) {
+        if (isSameDay(tdLocal, wd)) {
           if (!map.has(idx)) map.set(idx, []);
           map.get(idx)!.push(t);
         }

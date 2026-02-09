@@ -91,7 +91,7 @@ export default function OneThingCard({
 
       {task.due_date && (
         <p className="text-xs text-slate-500">
-          Due: {new Date(task.due_date).toLocaleDateString("en-US")}
+          Due: {new Date(task.due_date + "T12:00:00").toLocaleDateString("en-US")}
         </p>
       )}
 
