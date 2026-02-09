@@ -133,15 +133,48 @@ export default function BrainDumpChat({
     }
   }, [messages, isChatOpen]);
 
-  // Supabase Realtime: listen for auto-proceed dumps
+  // Listen for system-generated dumps (auto-proceed, scheduled messages)
+  // Uses Supabase Realtime with polling fallback
   useEffect(() => {
     const supabase = createClient();
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const seenIds = new Set<string>();
+
+    // Track IDs already in messages to avoid duplicates
+    const initDumpIds = dumps.map((d) => d.id);
+    initDumpIds.forEach((id) => seenIds.add(id));
+
+    const handleNewDump = (newDump: Dump) => {
+      if (seenIds.has(newDump.id)) return;
+      seenIds.add(newDump.id);
+
+      const isSystemMessage =
+        newDump.raw_content === "[AUTO_PROCEED]" ||
+        newDump.raw_content === "[SCHEDULED_MESSAGE]";
+      if (!isSystemMessage) return;
+
+      const analysis = newDump.ai_analysis as { response?: string } | null;
+      const responseText = analysis?.response;
+      if (!responseText) return;
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-auto-${newDump.id}`,
+          role: "ai" as const,
+          content: responseText,
+          timestamp: newDump.created_at,
+        },
+      ]);
+      onDumpCreatedRef.current?.();
+    };
 
     const setup = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Realtime subscription
       channel = supabase
         .channel("auto-proceed-updates")
         .on(
@@ -152,37 +185,35 @@ export default function BrainDumpChat({
             table: "dumps",
             filter: `user_id=eq.${user.id}`,
           },
-          (payload) => {
-            const newDump = payload.new as Dump;
-            // Only handle system-generated dumps (not regular user messages)
-            const isSystemMessage =
-              newDump.raw_content === "[AUTO_PROCEED]" ||
-              newDump.raw_content === "[SCHEDULED_MESSAGE]";
-            if (!isSystemMessage) return;
-
-            const analysis = newDump.ai_analysis as { response?: string } | null;
-            const responseText = analysis?.response;
-            if (!responseText) return;
-
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `ai-auto-${newDump.id}`,
-                role: "ai" as const,
-                content: responseText,
-                timestamp: newDump.created_at,
-              },
-            ]);
-            onDumpCreatedRef.current?.();
-          },
+          (payload) => handleNewDump(payload.new as Dump),
         )
         .subscribe();
+
+      // Polling fallback: check every 5s for system messages created in last 30s
+      pollTimer = setInterval(async () => {
+        const since = new Date(Date.now() - 30_000).toISOString();
+        const { data } = await supabase
+          .from("dumps")
+          .select("id, raw_content, ai_analysis, created_at, media_url")
+          .eq("user_id", user.id)
+          .in("raw_content", ["[AUTO_PROCEED]", "[SCHEDULED_MESSAGE]"])
+          .gte("created_at", since)
+          .order("created_at", { ascending: true });
+
+        if (data) {
+          for (const d of data) {
+            handleNewDump(d as Dump);
+          }
+        }
+      }, 5000);
     };
 
     setup();
     return () => {
       if (channel) supabase.removeChannel(channel);
+      if (pollTimer) clearInterval(pollTimer);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleImageSelect = useCallback((file: File) => {
@@ -358,6 +389,8 @@ export default function BrainDumpChat({
       setMessages((prev) => [...prev, errMsg]);
     } finally {
       setIsLoading(false);
+      // Re-focus input so user can keep typing
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   };
 
