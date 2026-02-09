@@ -247,12 +247,40 @@ ${personaFacts.length > 0
     - If you notice a repeated activity in recent records/tasks/conversation (e.g. running 3+ times, daily coffee, regular meditation), proactively suggest: "최근 기록을 보니 [활동]을 꾸준히 하고 계시네요. 습관 대시보드를 만들어드릴까요?"
     - Never be pushy — just a gentle one-time suggestion. If user declines, don't suggest again
 27. When you ask a question that REQUIRES user input before you can proceed (e.g. clarification, confirmation, choice between options), prefix your response with [NEEDS_INPUT]. Do NOT use this for rhetorical questions or when you've already completed the action.
-28. **Reminders & delayed messages:**
-    - When user asks to be reminded, notified, or messaged after some time → use schedule_message
+28. **Reminders & delayed messages — MUST use schedule_message tool:**
+    - When user asks to be reminded, notified, or messaged after some time → **ALWAYS call schedule_message tool**
     - "remind me in 5 minutes" → schedule_message(message: "Here's your reminder!", delay_seconds: 300)
     - "message me at 3pm" → schedule_message(message: "...", deliver_at: "2026-02-09T15:00:00-05:00")
+    - "message me in 5s" → schedule_message(message: "Hey! Here's your message!", delay_seconds: 5)
     - Write the message in a warm, helpful tone as if you're reaching out later
-    - You CAN set timers and schedule messages — use this tool for any time-based requests`;
+    - You HAVE the schedule_message tool — you MUST call it. Never just say "I've scheduled" without actually calling the tool
+    - **CRITICAL**: Do NOT respond with text claiming you scheduled a message. You MUST actually invoke the schedule_message function call. A text-only response about scheduling is WRONG`;
+}
+
+// ── Retry helper for transient API errors ──────────────────────────────
+
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 1000;
+
+async function sendWithRetry(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  chat: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  message: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await chat.sendMessage(message);
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      const isRetryable = status === 503 || status === 429;
+      if (!isRetryable || attempt === MAX_RETRIES) throw err;
+      const delay = RETRY_BASE_MS * Math.pow(2, attempt);
+      console.warn(`[Agent] Retryable error (${status}), attempt ${attempt + 1}/${MAX_RETRIES}, waiting ${delay}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
 }
 
 // ── SDK adapter helpers ────────────────────────────────────────────────
@@ -443,10 +471,7 @@ export async function runAgent(
   const chatOptions: any = {
     history,
     tools,
-    systemInstruction:
-      type === "vertex"
-        ? { role: "system", parts: [{ text: systemPrompt }] }
-        : systemPrompt,
+    systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
   };
   const chat = model.startChat(chatOptions);
 
@@ -466,8 +491,7 @@ export async function runAgent(
   }
 
   for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await chat.sendMessage(currentMessage as any);
+    const result = await sendWithRetry(chat, currentMessage);
 
     const functionCalls = extractFunctionCalls(type, result);
 
@@ -479,6 +503,43 @@ export async function runAgent(
         needsUserInput = true;
         text = text.replace("[NEEDS_INPUT]", "").trimStart();
       }
+
+      // Safety: detect hallucinated schedule_message (model claims to schedule without tool call)
+      const hasScheduleToolCall = toolCalls.some((tc) => tc.name === "schedule_message");
+      const claimsScheduled = /schedul|remind|timer|set.*(?:alarm|message)/i.test(text);
+      if (i === 0 && !hasScheduleToolCall && claimsScheduled) {
+        console.warn("[Agent] Detected hallucinated schedule response — retrying with forced function calling");
+        // Create a new chat session with forced function calling mode
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const forcedOptions: any = {
+          history,
+          tools,
+          toolConfig: {
+            functionCallingConfig: {
+              mode: "ANY",
+              allowedFunctionNames: ["schedule_message"],
+            },
+          },
+          systemInstruction: { role: "system", parts: [{ text: systemPrompt }] },
+        };
+        try {
+          const forcedChat = model.startChat(forcedOptions);
+          const forcedResult = await sendWithRetry(forcedChat, message);
+          const forcedCalls = extractFunctionCalls(type, forcedResult);
+          if (forcedCalls && forcedCalls.length > 0) {
+            for (const fc of forcedCalls) {
+              console.log(`[Agent] Forced tool call: ${fc.name}`, JSON.stringify(fc.args));
+              toolCalls.push({ name: fc.name, args: fc.args });
+              await executeTool(fc.name, fc.args, context.supabase, context.userId, context.dumpId, context.mediaUrl);
+            }
+            const forcedText = extractText(type, forcedResult);
+            return { message: forcedText || text, toolCalls, needsUserInput: false };
+          }
+        } catch (err) {
+          console.error("[Agent] Forced function calling failed:", err);
+        }
+      }
+
       console.log("[Agent] Final text response (no tool calls). Iteration:", i, "needsUserInput:", needsUserInput);
       return { message: text, toolCalls, needsUserInput };
     }

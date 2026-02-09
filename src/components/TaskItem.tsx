@@ -118,7 +118,6 @@ export default function TaskItem({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isDeleted, setIsDeleted] = useState(false);
 
   const handleToggleDone = async () => {
     if (isUpdating) return;
@@ -259,7 +258,7 @@ export default function TaskItem({
         body: JSON.stringify({ taskId: task.id }),
       });
       if (res.ok) {
-        setIsDeleted(true);
+        onTaskUpdate();
       }
     } catch {
       // ignore
@@ -269,44 +268,10 @@ export default function TaskItem({
     }
   };
 
-  const handleRestore = async () => {
-    setIsDeleting(true);
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: task.id, restore: true }),
-      });
-      if (res.ok) {
-        setIsDeleted(false);
-        onTaskUpdate();
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const notes = (Array.isArray(task.notes) ? task.notes : []) as TaskNote[];
 
-  if (isDeleted) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 flex items-center justify-between">
-        <span className="text-sm text-slate-400 line-through truncate">{task.title}</span>
-        <button
-          onClick={handleRestore}
-          disabled={isDeleting}
-          className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 transition-colors shrink-0 ml-2"
-        >
-          {isDeleting ? "..." : "Undo"}
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-slate-100 bg-white shadow-sm overflow-hidden group/task">
       {/* Always-visible row */}
       <div className="flex items-center gap-3 px-3 py-3">
         {/* Checkbox */}
@@ -359,6 +324,17 @@ export default function TaskItem({
           {notes.length > 0 && (
             <span className="text-xs text-slate-300">{notes.length}</span>
           )}
+          {/* Delete button (visible on hover) */}
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+            disabled={isDeleting}
+            className="w-4 h-4 text-slate-200 hover:text-red-400 opacity-0 group-hover/task:opacity-100 transition-all disabled:opacity-50"
+            title="Delete"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           {/* Chevron */}
           <svg
             className={`w-4 h-4 text-slate-300 transition-transform duration-200 ${

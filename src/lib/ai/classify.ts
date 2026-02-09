@@ -76,18 +76,15 @@ export async function classifyDump(
 
   let responseText: string;
 
-  if (type === "vertex") {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-    });
-    const response = await result.response;
-    responseText =
-      response.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  } else {
-    const genaiModel = model as GenerativeModel;
-    const result = await genaiModel.generateContent(fullPrompt);
-    responseText = result.response.text();
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result = await (model as any).generateContent({
+    contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+  });
+
+  responseText =
+    typeof result.response.text === "function"
+      ? result.response.text()
+      : result.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
   const jsonStr = responseText.replace(/```json\n?|\n?```/g, "").trim();
   const parsed = JSON.parse(jsonStr);

@@ -215,10 +215,9 @@ export async function DELETE(request: Request) {
 
   const { error } = await supabase
     .from("tasks")
-    .update({ deleted_at: new Date().toISOString() } as Database["public"]["Tables"]["tasks"]["Update"])
+    .delete()
     .eq("id", taskId)
-    .eq("user_id", user.id)
-    .is("deleted_at", null);
+    .eq("user_id", user.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

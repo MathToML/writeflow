@@ -299,7 +299,7 @@ export const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "schedule_message",
     description:
-      "Schedule a message to be sent to the user after a delay. Use for reminders, timers, follow-ups.",
+      "Schedule a message to be sent to the user after a delay. You MUST call this tool when the user asks for reminders, timers, delayed messages, or follow-ups. Never just say you scheduled something — always call this function.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {
@@ -763,16 +763,24 @@ async function scheduleMessage(
   if (error) return { success: false, error: error.message };
 
   // Send Inngest event
-  const { inngest } = await import("@/inngest/client");
-  await inngest.send({
-    name: "ai/schedule-message",
-    data: {
-      scheduledMessageId: data.id,
-      userId,
-      message,
-      deliverAt: deliverAt.toISOString(),
-    },
-  });
+  try {
+    const { inngest } = await import("@/inngest/client");
+    await inngest.send({
+      name: "ai/schedule-message",
+      data: {
+        scheduledMessageId: data.id,
+        userId,
+        message,
+        deliverAt: deliverAt.toISOString(),
+      },
+    });
+  } catch (inngestErr) {
+    console.error("[scheduleMessage] Failed to send Inngest event:", inngestErr);
+    return {
+      success: false,
+      error: "Message saved but delivery scheduling failed. The background job service may be unavailable.",
+    };
+  }
 
   return {
     success: true,

@@ -165,16 +165,20 @@ export async function POST(request: Request) {
         .single();
 
       if (pq) {
-        const { inngest } = await import("@/inngest/client");
-        await inngest.send({
-          name: "ai/auto-proceed",
-          data: {
-            pendingQuestionId: pq.id,
-            userId: user.id,
-            dumpId: dump.id,
-            timezone: userTimezone,
-          },
-        });
+        try {
+          const { inngest } = await import("@/inngest/client");
+          await inngest.send({
+            name: "ai/auto-proceed",
+            data: {
+              pendingQuestionId: pq.id,
+              userId: user.id,
+              dumpId: dump.id,
+              timezone: userTimezone,
+            },
+          });
+        } catch (inngestErr) {
+          console.error("[Chat API] Failed to send auto-proceed event:", inngestErr);
+        }
       }
     }
 
@@ -187,18 +191,26 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     // AI failure — dump is preserved
+    const errMsg = error instanceof Error ? error.message : "Agent failed";
+    console.error("[Chat API] Agent error:", errMsg);
+
     await supabase
       .from("dumps")
       .update({
         ai_analysis: {
-          error:
-            error instanceof Error ? error.message : "Agent failed",
+          error: errMsg,
         } as unknown as Json,
       })
       .eq("id", dump.id);
 
+    const status = (error as { status?: number }).status;
+    const userMessage =
+      status === 503 || status === 429
+        ? "AI가 지금 좀 바빠요. 잠시 후 다시 시도해주세요!"
+        : "Sorry, something went wrong. Please try again.";
+
     return NextResponse.json({
-      message: "Sorry, something went wrong. Please try again.",
+      message: userMessage,
       dumpId: dump.id,
       mediaUrl,
     });
