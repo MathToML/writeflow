@@ -67,7 +67,7 @@ export default function Navigation({ userName }: { userName?: string }) {
 
   return (
     <nav className="border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-      <div className="mx-auto px-4 h-14 flex items-center gap-1">
+      <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-1">
         <Link href="/" className="font-bold text-slate-900 mr-3 shrink-0">
           OTTD
         </Link>
@@ -83,12 +83,12 @@ export default function Navigation({ userName }: { userName?: string }) {
             }`}
           >
             {ICONS[item.icon]}
-            <span className="hidden sm:inline">{item.label}</span>
+            <span className="nav-label">{item.label}</span>
           </Link>
         ))}
         <div className="ml-auto" />
         {userName && (
-          <span className="text-sm text-slate-500 whitespace-nowrap shrink-0 hidden sm:inline">{userName}</span>
+          <span className="text-sm text-slate-500 whitespace-nowrap shrink-0 nav-label">{userName}</span>
         )}
         <button
           onClick={handleLogout}

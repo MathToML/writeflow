@@ -49,6 +49,15 @@ body {
   animation: slide-up 0.3s ease-out;
 }
 
+.nav-label {
+  display: inline;
+}
+@media (max-width: 640px) {
+  .nav-label {
+    display: none;
+  }
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
