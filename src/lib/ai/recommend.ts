@@ -125,6 +125,27 @@ export async function cacheRecommendation(
     .eq("id", userId);
 }
 
+// ── Scoring weights ──────────────────────────────────────────────────
+// These weights determine how tasks are ranked for OTTD recommendation.
+// Higher total score = more likely to be recommended right now.
+
+const SCORE_IN_PROGRESS = 20;        // Continuing a started task feels natural
+const SCORE_DUE_TODAY = 50;           // Due today — should be prioritized
+const SCORE_OVERDUE = 60;             // Past due — highest urgency
+const SCORE_DUE_SOON = 30;           // Due within 3 days
+const SCORE_IMPORTANCE_MULTIPLIER = 5; // importance (1-5) * this value
+const SCORE_DEFAULT_IMPORTANCE = 3;   // Assumed importance when not set
+const SCORE_CONTEXT_COMM = 15;        // Phone/communication: quick to send off
+const SCORE_CONTEXT_QUICK = 10;       // Quick tasks: easy wins
+const SCORE_CONTEXT_DESK = 5;         // Desk/focus work: default indoor bonus
+const SCORE_CONTEXT_ERRAND = 5;       // Errands: base bonus
+const SCORE_MOVING_PENALTY = -10;     // Desk work while moving = bad fit
+const SCORE_MOVING_BONUS = 20;        // Errands while moving = great fit
+const SCORE_OUTING_BONUS = 10;        // Errand + outing event today
+const SCORE_WAITING_PENALTY = -5;     // Waiting tasks are deprioritized
+const SCORE_MAX_AGE_BONUS = 10;       // Cap for aging bonus (prevents old tasks dominating)
+const TOP_CANDIDATES = 5;             // Number of candidates passed to Gemini
+
 // ── Scoring (rule-based candidate selection) ──────────────────────────
 
 export function scoreCandidates(
@@ -149,46 +170,46 @@ export function scoreCandidates(
     let score = 0;
 
     // In-progress bonus: continuing is natural
-    if (task.status === "in_progress") score += 20;
+    if (task.status === "in_progress") score += SCORE_IN_PROGRESS;
 
     // Due date urgency
     if (task.due_date === today) {
-      score += 50;
+      score += SCORE_DUE_TODAY;
     } else if (task.due_date && task.due_date < today) {
-      score += 60;
+      score += SCORE_OVERDUE;
     } else if (task.due_date) {
       const daysUntil = Math.ceil(
         (new Date(task.due_date).getTime() - now.getTime()) / 86400000,
       );
-      if (daysUntil <= 3) score += 30;
+      if (daysUntil <= 3) score += SCORE_DUE_SOON;
     }
 
     // Importance
-    score += (task.importance ?? 3) * 5;
+    score += (task.importance ?? SCORE_DEFAULT_IMPORTANCE) * SCORE_IMPORTANCE_MULTIPLIER;
 
     // Context type scoring
     switch (task.context_type) {
       case "phone":
       case "communication":
-        score += 15;
+        score += SCORE_CONTEXT_COMM;
         break;
       case "quick":
-        score += 10;
+        score += SCORE_CONTEXT_QUICK;
         break;
       case "computer":
       case "desk_work":
       case "focus":
-        score += 5;
-        if (locationSignal?.isMoving) score -= 10;
+        score += SCORE_CONTEXT_DESK;
+        if (locationSignal?.isMoving) score += SCORE_MOVING_PENALTY;
         break;
       case "errand":
       case "location_dependent":
-        score += 5;
-        if (hasOutingToday) score += 10;
-        if (locationSignal?.isMoving) score += 20;
+        score += SCORE_CONTEXT_ERRAND;
+        if (hasOutingToday) score += SCORE_OUTING_BONUS;
+        if (locationSignal?.isMoving) score += SCORE_MOVING_BONUS;
         break;
       case "waiting":
-        score -= 5;
+        score += SCORE_WAITING_PENALTY;
         break;
     }
 
@@ -196,14 +217,14 @@ export function scoreCandidates(
     const ageHours =
       (now.getTime() - new Date(task.created_at).getTime()) / 3600000;
     if (ageHours > 24) {
-      score += Math.min(ageHours / 24, 10);
+      score += Math.min(ageHours / 24, SCORE_MAX_AGE_BONUS);
     }
 
     return { task, score };
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, 5);
+  return scored.slice(0, TOP_CANDIDATES);
 }
 
 // ── Gemini AI recommendation ──────────────────────────────────────────
