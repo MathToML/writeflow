@@ -49,7 +49,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { taskId, status, note, noteData, restore } = await request.json();
+  const { taskId, status, note, noteData, restore, due_date } = await request.json();
 
   if (!taskId) {
     return NextResponse.json(
@@ -74,14 +74,19 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ task: data });
   }
 
-  if (!status && !note && !noteData) {
+  if (!status && !note && !noteData && due_date === undefined) {
     return NextResponse.json(
-      { error: "status, note, or noteData required" },
+      { error: "status, note, noteData, or due_date required" },
       { status: 400 },
     );
   }
 
   const updateData: Record<string, unknown> = {};
+
+  // Due date update (null to clear)
+  if (due_date !== undefined) {
+    updateData.due_date = due_date || null;
+  }
 
   // Status update
   if (status) {

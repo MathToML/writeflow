@@ -118,6 +118,7 @@ export default function TaskItem({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [dueDate, setDueDate] = useState(task.due_date ?? "");
 
   const handleToggleDone = async () => {
     if (isUpdating) return;
@@ -245,6 +246,20 @@ export default function TaskItem({
       // keep input for retry
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleDueDateChange = async (newDate: string) => {
+    setDueDate(newDate);
+    try {
+      await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: task.id, due_date: newDate || null }),
+      });
+      onTaskUpdate();
+    } catch {
+      setDueDate(task.due_date ?? "");
     }
   };
 
@@ -406,6 +421,26 @@ export default function TaskItem({
                     Cancel
                   </button>
                 </div>
+              )}
+            </div>
+
+            {/* Due date */}
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-400 shrink-0">Due</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => handleDueDateChange(e.target.value)}
+                className="px-2 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100 transition-all text-slate-600"
+              />
+              {dueDate && (
+                <button
+                  onClick={() => handleDueDateChange("")}
+                  className="text-xs text-slate-300 hover:text-slate-500 transition-colors"
+                  title="Clear due date"
+                >
+                  &times;
+                </button>
               )}
             </div>
 
