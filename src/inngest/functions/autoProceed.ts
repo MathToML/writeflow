@@ -113,6 +113,19 @@ export const handleAutoProceed = inngest.createFunction(
         .eq("id", pendingQuestionId);
     });
 
+    // 6. Send push notification
+    await step.run("send-push", async () => {
+      const { sendPushNotification } = await import(
+        "@/lib/firebase/sendNotification"
+      );
+      const body = result.message;
+      await sendPushNotification({
+        userId,
+        title: "OTTD",
+        body: body.length > 100 ? body.slice(0, 97) + "..." : body,
+      });
+    });
+
     return { success: true, message: result.message };
   },
 );

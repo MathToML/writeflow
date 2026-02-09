@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect } from "react";
+import NotificationBell from "./NotificationBell";
 
 // Consistent stroke-style icons (Lucide-inspired, 18x18)
 const ICONS: Record<string, React.ReactNode> = {
@@ -59,8 +61,24 @@ export default function Navigation({ userName }: { userName?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    if (profileOpen) {
+      document.addEventListener("mousedown", handleClick);
+      return () => document.removeEventListener("mousedown", handleClick);
+    }
+  }, [profileOpen]);
 
   const handleLogout = async () => {
+    setProfileOpen(false);
     await supabase.auth.signOut();
     router.push("/login");
   };
@@ -87,15 +105,39 @@ export default function Navigation({ userName }: { userName?: string }) {
           </Link>
         ))}
         <div className="ml-auto" />
-        {userName && (
-          <span className="text-sm text-slate-500 whitespace-nowrap shrink-0 nav-label">{userName}</span>
-        )}
-        <button
-          onClick={handleLogout}
-          className="text-xs text-slate-400 hover:text-slate-600 transition-colors shrink-0"
-        >
-          Logout
-        </button>
+        <NotificationBell />
+        <div className="relative shrink-0" ref={profileRef}>
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            {userName && <span className="nav-label">{userName}</span>}
+          </button>
+          {profileOpen && (
+            <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-slate-100 py-1 animate-in z-50">
+              {userName && (
+                <div className="px-3 py-2 text-sm text-slate-500 border-b border-slate-100">
+                  {userName}
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   );

@@ -58,6 +58,18 @@ export const handleScheduledMessage = inngest.createFunction(
         .eq("id", scheduledMessageId);
     });
 
+    // 4. Send push notification
+    await step.run("send-push", async () => {
+      const { sendPushNotification } = await import(
+        "@/lib/firebase/sendNotification"
+      );
+      await sendPushNotification({
+        userId,
+        title: "OTTD",
+        body: message.length > 100 ? message.slice(0, 97) + "..." : message,
+      });
+    });
+
     return { success: true };
   },
 );
