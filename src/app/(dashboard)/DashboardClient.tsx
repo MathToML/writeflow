@@ -79,9 +79,9 @@ export default function DashboardClient({
   const [isLoadingOTTD, setIsLoadingOTTD] = useState(false);
   const [wellnessMessage, setWellnessMessage] = useState<string | null>(null);
 
-  // Fetch AI recommendation on cache miss
-  const fetchRecommendation = useCallback(async () => {
-    if (aiRecommendation || wellnessMessage) return;
+  // Fetch AI recommendation
+  const fetchRecommendation = useCallback(async (skipCache = false) => {
+    if (!skipCache && (aiRecommendation || wellnessMessage)) return;
     setIsLoadingOTTD(true);
     try {
       // Try to get location context (silent — no error if denied)
@@ -89,6 +89,7 @@ export default function DashboardClient({
       const body: Record<string, unknown> = {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
+      if (skipCache) body.skipCache = true;
       if (location?.isAvailable) {
         body.locationSignal = {
           isMoving: location.isMoving,
@@ -104,8 +105,10 @@ export default function DashboardClient({
       const data = await res.json();
       if (data.wellness) {
         setWellnessMessage(data.wellness);
+        setAiRecommendation(null);
       } else if (data.recommendation) {
         setAiRecommendation(data.recommendation);
+        setWellnessMessage(null);
       }
     } catch {
       // Silently fail — user can retry
@@ -190,7 +193,10 @@ export default function DashboardClient({
                 task={aiRecommendation.task}
                 reason={aiRecommendation.reason}
                 onComplete={refresh}
-                onDefer={() => setShowOTTD(false)}
+                onDefer={() => {
+                  setAiRecommendation(null);
+                  fetchRecommendation(true);
+                }}
               />
             </div>
           ) : showOTTD && isLoadingOTTD ? (

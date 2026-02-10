@@ -19,9 +19,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { timezone, locationSignal } = (await request.json().catch(() => ({}))) as {
+  const { timezone, locationSignal, skipCache } = (await request.json().catch(() => ({}))) as {
     timezone?: string;
     locationSignal?: LocationSignal;
+    skipCache?: boolean;
   };
   const tz = timezone || "Asia/Seoul";
 
@@ -94,15 +95,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ recommendation: null });
   }
 
-  // Check cache first
+  // Check cache first (skip if explicitly requested)
   const contextHash = computeContextHash(activeTasks, events, locationSignal);
-  const cached = await getCachedRecommendation(supabase, user.id, contextHash);
-  if (cached) {
-    const cachedTask = activeTasks.find((t) => t.id === cached.task_id);
-    if (cachedTask) {
-      return NextResponse.json({
-        recommendation: { task: cachedTask, reason: cached.reason },
-      });
+  if (!skipCache) {
+    const cached = await getCachedRecommendation(supabase, user.id, contextHash);
+    if (cached) {
+      const cachedTask = activeTasks.find((t) => t.id === cached.task_id);
+      if (cachedTask) {
+        return NextResponse.json({
+          recommendation: { task: cachedTask, reason: cached.reason },
+        });
+      }
     }
   }
 
