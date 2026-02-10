@@ -254,6 +254,7 @@ export async function generateAIRecommendation(
               hour: "numeric",
               minute: "2-digit",
               hour12: true,
+              timeZone: timezone,
             });
             return `- ${t} "${e.title}"${e.location ? ` @ ${e.location}` : ""}`;
           })
