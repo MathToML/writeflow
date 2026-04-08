@@ -330,7 +330,7 @@ export default function TaskItem({
           )}
           {task.due_date && (
             <span className="text-xs text-slate-400 font-mono">
-              {new Date(task.due_date + "T12:00:00").toLocaleDateString("ko-KR", {
+              {new Date(task.due_date + "T12:00:00").toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
               })}

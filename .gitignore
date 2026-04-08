@@ -36,6 +36,9 @@ yarn-error.log*
 # claude code
 .claude/
 
+# project notes (local only)
+PROJECT_STATUS.md
+
 # vercel
 .vercel
 
